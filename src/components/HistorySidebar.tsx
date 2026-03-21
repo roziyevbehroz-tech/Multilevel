@@ -68,7 +68,12 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
       });
       
       const audioBase64 = (reader.result as string).split(",")[1];
-      const context = `Foydalanuvchi quyidagi savolga javob bergan: "${answer.questionText}" (${answer.part}). Iltimos, uning javobini tahlil qilib ber.`;
+      const context = `Foydalanuvchi quyidagi savolga javob bergan: "${answer.questionText}" (${answer.part}). Iltimos, uning javobini tahlil qilib ber.
+      Tahlilda quyidagi jihatlarga alohida e'tibor qarat:
+      1. Pronunciation (talaffuz) - accent va enunciation (aniq talaffuz) bo'yicha baho ber (1-10 ball).
+      2. Xatolarni aniq ko'rsat va ularni qanday to'g'rilashni tushuntir.
+      3. Umumiy tavsiyalar ber.
+      4. Ushbu savol uchun yuqori ball oladigan 'model answer' (namunaviy javob) yozib ber va foydalanuvchining javobi bilan solishtirib, lug'at va grammatika bo'yicha farqlarni jadval ko'rinishida ko'rsat.`;
       
       const response = await gemini.analyzeAudio(audioBase64, "audio/webm", context);
       const analysisText = response.text || "Tahlil qilib bo'lmadi.";

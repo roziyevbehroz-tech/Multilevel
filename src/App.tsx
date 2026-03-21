@@ -25,9 +25,11 @@ import {
 import ReactMarkdown from "react-markdown";
 import localforage from "localforage";
 import { gemini } from "./services/gemini";
-import { ExamStage, CEFRLevel, Message, ExamState, SavedAnswer } from "./types";
+import { ExamStage, CEFRLevel, Message, ExamState, SavedAnswer, AnalysisPreferences } from "./types";
 import { AITeacherPanel } from "./components/AITeacherPanel";
 import { HistorySidebar } from "./components/HistorySidebar";
+import { ProfileSection } from "./components/ProfileSection";
+import { UserProfile } from "./types";
 
 export type MockQuestion = {
   id: string;
@@ -35,7 +37,7 @@ export type MockQuestion = {
   text: string;
   timeLimit: number;
   prepTime?: number;
-  imageUrl?: string;
+  imageUrls?: string[];
   part3Data?: { topic: string; for: string[]; against: string[] };
 };
 
@@ -63,8 +65,10 @@ const MOCK_TEST_1: MockQuestion[] = [
     part: "Part 1.2",
     text: "What do you see in these pictures?",
     timeLimit: 45,
-    imageUrl:
+    imageUrls: [
       "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800"
+    ],
   },
   {
     id: "1.2.2",
@@ -84,8 +88,10 @@ const MOCK_TEST_1: MockQuestion[] = [
     text: "Tell me about a moment you had to be honest although it was difficult.\n• How did the other person react to your honesty?\n• Why do you think being honest is important, even in challenging situations?",
     timeLimit: 120,
     prepTime: 60,
-    imageUrl:
+    imageUrls: [
       "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800"
+    ],
   },
   {
     id: "3.1",
@@ -134,7 +140,32 @@ const LessonLabAssistant: React.FC = () => {
   const [analysisPreference, setAnalysisPreference] = useState<
     "each_question" | "each_part" | "end_of_mock"
   >("end_of_mock");
+  const [analysisPreferences, setAnalysisPreferences] = useState<AnalysisPreferences>({
+    pronunciation: true,
+    grammar: true,
+    vocabulary: true,
+    fluency: true,
+  });
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: 'Foydalanuvchi',
+    targetCEFR: 'B2',
+    preferredLanguage: 'Uzbek',
+  });
+  const [showProfile, setShowProfile] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [practiceQuestionIndex, setPracticeQuestionIndex] = useState(0);
+
+  useEffect(() => {
+    const partPrefix = selectedPart.split(" ").slice(0, 2).join(" ");
+    const questions = MOCK_TEST_1.filter((q) => q.part === partPrefix);
+    if (questions.length > 0) {
+      const randomIndex = Math.floor(Math.random() * questions.length);
+      const globalIndex = MOCK_TEST_1.findIndex((q) => q.id === questions[randomIndex].id);
+      setPracticeQuestionIndex(globalIndex !== -1 ? globalIndex : 0);
+    }
+  }, [selectedPart]);
+
   const [mockAnswers, setMockAnswers] = useState<
     {
       questionId: string;
@@ -284,7 +315,7 @@ const LessonLabAssistant: React.FC = () => {
     );
   };
 
-  const startLiveSession = async () => {
+  const startLiveSession = async (isTutorMode: boolean = false) => {
     if (isStartingLive) return;
     setIsStartingLive(true);
     try {
@@ -371,7 +402,7 @@ const LessonLabAssistant: React.FC = () => {
       source.connect(processor);
       setAudioWorkletNode(processor);
 
-      const sessionPromise = gemini.connectLive({
+      const callbacks = {
         onopen: () => {
           setIsLive(true);
           setIsStartingLive(false);
@@ -379,12 +410,12 @@ const LessonLabAssistant: React.FC = () => {
             ...prev,
             {
               role: "model",
-              text: "[Live Session Started] Hello! I'm listening. Speak naturally.",
+              text: "Men eshityapman. Javobingizni boshlashingiz mumkin.",
               timestamp: Date.now(),
             },
           ]);
         },
-        onmessage: async (message) => {
+        onmessage: async (message: any) => {
           if (message.serverContent?.modelTurn?.parts) {
             const parts = message.serverContent.modelTurn.parts;
             for (const part of parts) {
@@ -408,7 +439,7 @@ const LessonLabAssistant: React.FC = () => {
             }
           }
         },
-        onerror: (err) => {
+        onerror: (err: any) => {
           console.error("Live Error:", err);
           setIsStartingLive(false);
         },
@@ -416,7 +447,9 @@ const LessonLabAssistant: React.FC = () => {
           setIsLive(false);
           setIsStartingLive(false);
         },
-      });
+      };
+
+      const sessionPromise = isTutorMode ? gemini.connectTutorLive(callbacks) : gemini.connectLive(callbacks);
 
       processor.port.onmessage = (e) => {
         const pcm = e.data;
@@ -495,6 +528,9 @@ const LessonLabAssistant: React.FC = () => {
   };
 
   const playAudioChunk = (pcm: Int16Array, ctx: AudioContext) => {
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     const buffer = ctx.createBuffer(1, pcm.length, 16000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) {
@@ -571,15 +607,18 @@ const LessonLabAssistant: React.FC = () => {
             Mock Exam
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <button
+          onClick={() => setShowProfile(true)}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
           <div className="text-right hidden sm:block">
-            <div className="text-sm font-bold text-[#1E293B]">Candidate</div>
+            <div className="text-sm font-bold text-[#1E293B]">{userProfile.name}</div>
             <div className="text-xs text-gray-500">+998907252040</div>
           </div>
           <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white">
             <User size={18} />
           </div>
-        </div>
+        </button>
       </header>
 
       {examMode === "practice" && (
@@ -588,17 +627,23 @@ const LessonLabAssistant: React.FC = () => {
           <div className="max-w-4xl mx-auto px-6 my-8">
             <div className="flex items-center justify-between relative">
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 z-0"></div>
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1/3 h-1 bg-[#218838] z-0"></div>
+              <motion.div 
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-indigo-600 z-0"
+                initial={{ width: "0%" }}
+                animate={{ width: selectedPart.includes("Part 1") ? "33%" : selectedPart.includes("Part 2") ? "66%" : "100%" }}
+                transition={{ duration: 0.5 }}
+              ></motion.div>
 
-              <div className="w-10 h-10 bg-[#218838] text-white rounded flex items-center justify-center font-bold z-10 relative">
-                1
-              </div>
-              <div className="w-10 h-10 bg-[#1E73BE] text-white rounded flex items-center justify-center font-bold z-10 relative">
-                2
-              </div>
-              <div className="w-10 h-10 bg-[#1E73BE] text-white rounded flex items-center justify-center font-bold z-10 relative">
-                3
-              </div>
+              {[1, 2, 3].map((part) => (
+                <div key={part} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold z-10 relative transition-colors ${
+                  (part === 1 && selectedPart.includes("Part 1")) || 
+                  (part === 2 && selectedPart.includes("Part 2")) || 
+                  (part === 3 && selectedPart.includes("Part 3")) 
+                  ? "bg-indigo-600 text-white" : "bg-white border-2 border-indigo-600 text-indigo-600"
+                }`}>
+                  {part}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -611,10 +656,12 @@ const LessonLabAssistant: React.FC = () => {
                   <select
                     value={selectedPart}
                     onChange={(e) => setSelectedPart(e.target.value)}
-                    className="bg-transparent outline-none cursor-pointer uppercase"
+                    className="bg-transparent outline-none cursor-pointer uppercase text-indigo-700 font-bold"
                   >
                     <option value="Part 1.1 (Personal)">PART-1.1</option>
                     <option value="Part 1.2 (Picture)">PART-1.2</option>
+                    <option value="Part 2 (Cue Card)">PART-2</option>
+                    <option value="Part 3 (Discussion)">PART-3</option>
                   </select>
                 </div>
                 <div className="text-sm text-gray-500 border border-gray-200 px-4 py-1.5 rounded bg-gray-50">
@@ -625,40 +672,73 @@ const LessonLabAssistant: React.FC = () => {
 
               {/* Card Body */}
               <div className="p-8 md:p-12 flex flex-col items-center">
-                <div className="flex items-center gap-3 mb-6 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
-                  <Bot size={24} className="text-indigo-600" />
-                  <span className="text-indigo-900 font-bold text-sm tracking-wide uppercase">
-                    Super AI Examiner
+                <button
+                  onClick={() => startLiveSession(true)}
+                  className="flex items-center gap-3 mb-6 bg-emerald-50 px-6 py-3 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                >
+                  <Bot size={24} className="text-emerald-600" />
+                  <span className="text-emerald-900 font-bold text-sm tracking-wide uppercase">
+                    AI TUTOR
                   </span>
-                </div>
+                </button>
                 <h2 className="text-[#E87722] font-bold text-xl mb-4 tracking-wide uppercase">
                   Practice Mode
                 </h2>
-                <p className="text-[#1E293B] font-bold text-2xl md:text-3xl mb-12 text-center max-w-3xl">
+
+                {/* Display Practice Question */}
+                <div className="w-full max-w-3xl mb-8 flex flex-col items-center">
+                  {MOCK_TEST_1[practiceQuestionIndex].imageUrls && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 w-full max-w-2xl">
+                      {MOCK_TEST_1[practiceQuestionIndex].imageUrls?.map((url, index) => (
+                        <img
+                          key={index}
+                          src={url}
+                          alt={`Practice prompt ${index + 1}`}
+                          className="w-full rounded-lg shadow-md object-cover h-64"
+                          referrerPolicy="no-referrer"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl text-center whitespace-pre-line">
+                    {MOCK_TEST_1[practiceQuestionIndex].text}
+                  </div>
+                  {MOCK_TEST_1[practiceQuestionIndex].part3Data && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-6 text-left">
+                      <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+                        <h4 className="font-bold text-green-800 mb-3">FOR</h4>
+                        <ul className="list-disc pl-5 space-y-2 text-green-900">
+                          {MOCK_TEST_1[practiceQuestionIndex].part3Data?.for.map(
+                            (point, i) => (
+                              <li key={i}>{point}</li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                      <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+                        <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
+                        <ul className="list-disc pl-5 space-y-2 text-red-900">
+                          {MOCK_TEST_1[practiceQuestionIndex].part3Data?.against.map(
+                            (point, i) => (
+                              <li key={i}>{point}</li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-gray-500 font-medium text-sm md:text-base mb-8 text-center max-w-xl leading-snug italic">
                   {messages
                     .filter((m) => m.role === "model")
                     .pop()
-                    ?.text?.replace(
-                      "[Live Session Started] Hello! I'm listening. Speak naturally.",
-                      "Do you prefer desktops or laptops?",
-                    ) || "Do you prefer desktops or laptops?"}
+                    ?.text || "Tayyormisiz? Speaking mashqini boshlaymiz!"}
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
-                  {/* Think Time */}
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <AlertTriangle size={32} className="text-[#1E293B]" />
-                    <div className="text-[#1E293B] font-bold">
-                      O'ylash uchun
-                    </div>
-                    <div className="text-[#1E73BE] font-bold text-xl">
-                      0 second
-                    </div>
-                  </div>
-
                   {/* Visualizer & Record Button */}
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="flex items-end gap-1 h-24 justify-center w-full">
+                  <div className="flex flex-col items-center gap-4 w-full">
+                    <div className="flex items-end gap-1 h-16 justify-center w-full">
                       {isLive
                         ? Array.from(visualizerData)
                             .slice(0, 24)
@@ -668,7 +748,7 @@ const LessonLabAssistant: React.FC = () => {
                                 style={{
                                   height: `${Math.max(10, (value / 255) * 100)}%`,
                                 }}
-                                className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
+                                className="w-2 md:w-3 bg-indigo-500 rounded-t-sm transition-all duration-75"
                               />
                             ))
                         : Array.from({ length: 24 }).map((_, i) => (
@@ -680,13 +760,15 @@ const LessonLabAssistant: React.FC = () => {
                     </div>
 
                     {!isLive && !isStartingLive ? (
-                      <button
-                        onClick={startLiveSession}
-                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
-                      >
-                        <Mic size={20} />
-                        JAVOB BERISHNI BOSHLASH
-                      </button>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <button
+                          onClick={() => startLiveSession(false)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5"
+                        >
+                          <Mic size={20} />
+                          JAVOB BERISH
+                        </button>
+                      </div>
                     ) : isStartingLive ? (
                       <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
                         <Loader2 size={20} className="animate-spin" />
@@ -695,29 +777,28 @@ const LessonLabAssistant: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => stopLiveSession(true)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
+                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 animate-pulse"
                       >
                         <Square size={20} fill="currentColor" />
-                        YAKUNLASH VA TAHLIL QILISH
+                        YAKUNLASH
                       </button>
                     )}
                   </div>
 
                   {/* Speak Time */}
-                  <div className="flex flex-col items-center justify-center gap-3">
+                  <div className="flex flex-col items-center justify-center gap-3 mt-8">
                     <Clock size={32} className="text-[#1E293B]" />
                     <div className="text-[#1E293B] font-bold">
-                      Javob berish uchun
+                      Qolgan vaqt
                     </div>
                     <div
                       className={`font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
-                      {timeLeft !== null ? `${timeLeft} second` : "0 second"}
+                      {timeLeft !== null ? `${timeLeft} second` : `${selectedPart === "Part 1.2 (Picture)" ? 45 : 30} second`}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Footer Actions */}
             <div className="flex flex-wrap justify-center gap-4 mt-8">
@@ -725,13 +806,12 @@ const LessonLabAssistant: React.FC = () => {
                 <LogOut size={18} />
                 Chiqish
               </button>
-              {(recordedChunks.length > 0 || analysisResult) && (
+              {(recordedChunks.length > 0) && (
                 <button
                   onClick={() => {
                     stopLiveSession();
                     setUserAudioUrl(null);
                     setRecordedChunks([]);
-                    setAnalysisResult(null);
                   }}
                   className="flex items-center gap-2 border-2 border-[#1E73BE] text-[#1E73BE] hover:bg-[#1E73BE] hover:text-white px-8 py-2.5 rounded font-bold transition-colors"
                 >
@@ -741,8 +821,7 @@ const LessonLabAssistant: React.FC = () => {
               )}
             </div>
 
-            {/* Analysis Results */}
-            {isTyping && (
+                   {isTyping && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -764,44 +843,6 @@ const LessonLabAssistant: React.FC = () => {
                 </p>
               </motion.div>
             )}
-
-            {analysisResult && !isTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-12 bg-white rounded-xl shadow-xl border border-indigo-200 overflow-hidden"
-              >
-                <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6 text-white flex items-center gap-4">
-                  <div className="bg-white/20 p-3 rounded-lg backdrop-blur-sm">
-                    <Bot size={32} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold">
-                      Super AI Agent Tahlili
-                    </h3>
-                    <p className="text-indigo-100 text-sm">
-                      Sizning javobingiz Multi-level mezonlari asosida baholandi
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-8">
-                  {userAudioUrl && (
-                    <div className="mb-8 p-5 bg-gray-50 rounded-xl border border-gray-200 flex flex-col gap-3">
-                      <div className="flex items-center gap-2 text-indigo-700 font-bold uppercase tracking-wider text-sm">
-                        <Play size={16} />
-                        Sizning ovozingiz:
-                      </div>
-                      <audio src={userAudioUrl} controls className="w-full" />
-                    </div>
-                  )}
-
-                  <div className="markdown-body prose prose-indigo max-w-none prose-headings:text-indigo-900 prose-strong:text-indigo-800 prose-a:text-blue-600">
-                    <ReactMarkdown>{analysisResult}</ReactMarkdown>
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </main>
         </>
       )}
@@ -818,7 +859,6 @@ const LessonLabAssistant: React.FC = () => {
               Ushbu mock test haqiqiy imtihon formatida bo'lib, Part 1.1, Part
               1.2, Part 2 va Part 3 larni o'z ichiga oladi.
             </p>
-
             <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8 text-left">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Settings size={20} className="text-indigo-600" />
@@ -901,12 +941,18 @@ const LessonLabAssistant: React.FC = () => {
                 </span>
               </div>
 
-              {MOCK_TEST_1[currentQuestionIndex].imageUrl && (
-                <img
-                  src={MOCK_TEST_1[currentQuestionIndex].imageUrl}
-                  alt="Exam prompt"
-                  className="max-w-md w-full rounded-lg shadow-md mb-8 object-cover max-h-64"
-                />
+              {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
+                  {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
+                    <img
+                      key={index}
+                      src={url}
+                      alt={`Exam prompt ${index + 1}`}
+                      className="w-full rounded-lg shadow-md object-cover h-64"
+                      referrerPolicy="no-referrer"
+                    />
+                  ))}
+                </div>
               )}
 
               <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-12 text-center max-w-3xl whitespace-pre-line">
@@ -998,11 +1044,23 @@ const LessonLabAssistant: React.FC = () => {
                       ULANMOQDA...
                     </div>
                   ) : isPrepTime ? (
+                    <button
+                      onClick={() => {
+                        setPrepTimeLeft(0);
+                        setIsPrepTime(false);
+                        startLiveSession();
+                      }}
+                      className="bg-orange-100 hover:bg-orange-200 text-orange-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg transition-colors"
+                    >
+                      <Timer size={20} /> TAYYORGARLIKNI TUGATISH
+                    </button>
+                  ) : (
                     <div className="bg-orange-100 text-orange-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
                       <Timer size={20} className="animate-spin-slow" />
                       TAYYORGARLIK VAQTI...
                     </div>
-                  ) : (
+                  )}
+                  {isLive && (
                     <button
                       onClick={() => stopLiveSession(true)}
                       className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
@@ -1017,7 +1075,7 @@ const LessonLabAssistant: React.FC = () => {
                 <div className="flex flex-col items-center justify-center gap-3">
                   <Clock size={32} className="text-[#1E293B]" />
                   <div className="text-[#1E293B] font-bold">
-                    Javob berish uchun
+                    Qolgan vaqt
                   </div>
                   <div
                     className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
@@ -1134,6 +1192,14 @@ const LessonLabAssistant: React.FC = () => {
             </div>
           </div>
         </main>
+      )}
+
+      {showProfile && (
+        <ProfileSection
+          profile={userProfile}
+          setProfile={setUserProfile}
+          onClose={() => setShowProfile(false)}
+        />
       )}
     </div>
   );

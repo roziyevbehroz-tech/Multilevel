@@ -27,6 +27,35 @@ export interface SavedAnswer {
   analysis: string | null;
   timestamp: number;
 }
+export interface VocabularyWord {
+  id: string;
+  word: string;
+  definition: string;
+  example: string;
+  timestamp: number;
+}
+
+export interface ProgressData {
+  id: string;
+  timestamp: number;
+  score: number;
+  grammarStrengths: string[];
+  grammarWeaknesses: string[];
+  vocabularyCount: number;
+}
+
+export interface UserProfile {
+  targetCEFR: CEFRLevel;
+  preferredLanguage: 'Uzbek' | 'English';
+  name: string;
+}
+
+export interface AnalysisPreferences {
+  pronunciation: boolean;
+  grammar: boolean;
+  vocabulary: boolean;
+  fluency: boolean;
+}
 
 export interface ExamState {
   stage: ExamStage;
