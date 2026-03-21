@@ -1,0 +1,5 @@
+{
+  "name": "LessonLab Speaking Assistant",
+  "description": "A specialized CEFR Multi-level English Speaking Examiner and Support Teacher for Uzbek students.",
+  "requestFramePermissions": ["microphone"]
+}

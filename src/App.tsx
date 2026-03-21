@@ -1,0 +1,1144 @@
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Mic,
+  Square,
+  Play,
+  RotateCcw,
+  Send,
+  MessageSquare,
+  Award,
+  BookOpen,
+  ChevronRight,
+  User,
+  Bot,
+  Loader2,
+  Globe,
+  Zap,
+  Timer,
+  AlertTriangle,
+  Clock,
+  LogOut,
+  CheckCircle2,
+  Settings,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import localforage from "localforage";
+import { gemini } from "./services/gemini";
+import { ExamStage, CEFRLevel, Message, ExamState, SavedAnswer } from "./types";
+import { AITeacherPanel } from "./components/AITeacherPanel";
+import { HistorySidebar } from "./components/HistorySidebar";
+
+export type MockQuestion = {
+  id: string;
+  part: string;
+  text: string;
+  timeLimit: number;
+  prepTime?: number;
+  imageUrl?: string;
+  part3Data?: { topic: string; for: string[]; against: string[] };
+};
+
+const MOCK_TEST_1: MockQuestion[] = [
+  {
+    id: "1.1.1",
+    part: "Part 1.1",
+    text: "What do you do on weekends?",
+    timeLimit: 30,
+  },
+  {
+    id: "1.1.2",
+    part: "Part 1.1",
+    text: "What is your favourite drink?",
+    timeLimit: 30,
+  },
+  {
+    id: "1.1.3",
+    part: "Part 1.1",
+    text: "Do you wake up early?",
+    timeLimit: 30,
+  },
+  {
+    id: "1.2.1",
+    part: "Part 1.2",
+    text: "What do you see in these pictures?",
+    timeLimit: 45,
+    imageUrl:
+      "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=800",
+  },
+  {
+    id: "1.2.2",
+    part: "Part 1.2",
+    text: "What are the advantages of reading a book over watching a TV?",
+    timeLimit: 30,
+  },
+  {
+    id: "1.2.3",
+    part: "Part 1.2",
+    text: "Do you agree that people read books less now than the past?",
+    timeLimit: 30,
+  },
+  {
+    id: "2.1",
+    part: "Part 2",
+    text: "Tell me about a moment you had to be honest although it was difficult.\n• How did the other person react to your honesty?\n• Why do you think being honest is important, even in challenging situations?",
+    timeLimit: 120,
+    prepTime: 60,
+    imageUrl:
+      "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800",
+  },
+  {
+    id: "3.1",
+    part: "Part 3",
+    text: "All students should learn a second language.",
+    timeLimit: 180,
+    prepTime: 60,
+    part3Data: {
+      topic: "All students should learn a second language.",
+      for: [
+        "Improves cognitive abilities like memory and problem-solving.",
+        "Enhances career opportunities in a globalized job market.",
+        "Promotes cultural understanding and global communication skills.",
+      ],
+      against: [
+        "Not all students are interested or skilled in languages.",
+        "Time could be spent on more essential subjects.",
+        "Translation technology reduces the need for learning languages.",
+      ],
+    },
+  },
+];
+
+const LessonLabAssistant: React.FC = () => {
+  const [isAITeacherOpen, setIsAITeacherOpen] = useState(false);
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
+  const [initialSelectedAnswer, setInitialSelectedAnswer] = useState<SavedAnswer | null>(null);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "model",
+      text: "Assalomu alaykum! Men LessonLab Speaking Assistant-man. Bugun siz bilan ingliz tili speaking darajangizni aniqlaymiz va Multi-level imtihoniga tayyorlanamiz. Tayyormisiz? Let's start with a real-time voice conversation. Click the 'Live' button to begin!",
+      timestamp: Date.now(),
+    },
+  ]);
+  const [isLive, setIsLive] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [selectedPart, setSelectedPart] = useState("Part 1.1 (Personal)");
+  const [session, setSession] = useState<any>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+
+  // Mock Exam States
+  const [examMode, setExamMode] = useState<
+    "practice" | "mock_setup" | "mock_running" | "mock_review" | "mock_finished"
+  >("mock_setup");
+  const [analysisPreference, setAnalysisPreference] = useState<
+    "each_question" | "each_part" | "end_of_mock"
+  >("end_of_mock");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [mockAnswers, setMockAnswers] = useState<
+    {
+      questionId: string;
+      audioUrl: string;
+      analysis: string | null;
+      isAnalyzing: boolean;
+    }[]
+  >([]);
+  const isSwitchingModeRef = useRef(false);
+  const [isPrepTime, setIsPrepTime] = useState(false);
+  const [prepTimeLeft, setPrepTimeLeft] = useState<number | null>(null);
+  const [isStartingLive, setIsStartingLive] = useState(false);
+
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [visualizerData, setVisualizerData] = useState<Uint8Array>(
+    new Uint8Array(0),
+  );
+  const [userAudioUrl, setUserAudioUrl] = useState<string | null>(null);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [audioWorkletNode, setAudioWorkletNode] =
+    useState<AudioWorkletNode | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const pendingAnalysisRef = useRef(false);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handlePracticeRecordingStop = async (blob: Blob) => {
+    setIsTyping(true);
+    setAnalysisResult(null);
+    
+    try {
+      const audioUrl = URL.createObjectURL(blob);
+      const answerId = `answer_${Date.now()}_practice`;
+      
+      await localforage.setItem(answerId, {
+        id: answerId,
+        questionId: "practice",
+        part: selectedPart,
+        questionText: `Practice: ${selectedPart}`,
+        audioUrl,
+        audioBlob: blob,
+        transcript: null,
+        analysis: null,
+        timestamp: Date.now(),
+      });
+      
+      setHistoryRefreshTrigger(prev => prev + 1);
+      setAnalysisResult("Javobingiz saqlandi. Tahlil qilish uchun o'ng tomondagi 'AI Teacher' tugmasini bosing yoki chapdagi 'Javoblar Tarixi' panelidan foydalaning.");
+    } catch (err) {
+      console.error("Error saving practice answer:", err);
+      setAnalysisResult("Kechirasiz, javobni saqlashda xatolik yuz berdi.");
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleMockRecordingStop = async (blob: Blob) => {
+    const currentQ = MOCK_TEST_1[currentQuestionIndex];
+    const audioUrl = URL.createObjectURL(blob);
+
+    try {
+      const answerId = `answer_${Date.now()}_${currentQ.id}`;
+      await localforage.setItem(answerId, {
+        id: answerId,
+        questionId: currentQ.id,
+        part: currentQ.part,
+        questionText: currentQ.text,
+        audioUrl,
+        audioBlob: blob,
+        transcript: null,
+        analysis: null,
+        timestamp: Date.now(),
+      });
+      setHistoryRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error("Error saving mock answer:", err);
+    }
+
+    setMockAnswers((prev) => {
+      const newAnswers = [...prev];
+      newAnswers[currentQuestionIndex] = {
+        questionId: currentQ.id,
+        audioUrl,
+        analysis: null,
+        isAnalyzing: false,
+      };
+      return newAnswers;
+    });
+
+    const isLastQuestion = currentQuestionIndex === MOCK_TEST_1.length - 1;
+
+    if (!isLastQuestion) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+    } else {
+      setExamMode("mock_finished");
+    }
+  };
+
+  useEffect(() => {
+    if (isPrepTime && prepTimeLeft !== null) {
+      if (prepTimeLeft <= 0) {
+        setIsPrepTime(false);
+        startLiveSession();
+        return;
+      }
+      const timer = setInterval(() => {
+        setPrepTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isPrepTime, prepTimeLeft]);
+
+  useEffect(() => {
+    if (isLive && timeLeft !== null) {
+      if (timeLeft <= 0) {
+        stopLiveSession(true); // Auto-analyze when time is up
+        return;
+      }
+      timerIntervalRef.current = setInterval(() => {
+        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [isLive, timeLeft]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const updateVisualizer = (analyserNode: AnalyserNode) => {
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(dataArray);
+    setVisualizerData(new Uint8Array(dataArray));
+    animationFrameRef.current = requestAnimationFrame(() =>
+      updateVisualizer(analyserNode),
+    );
+  };
+
+  const startLiveSession = async () => {
+    if (isStartingLive) return;
+    setIsStartingLive(true);
+    try {
+      // Set initial time based on selected part or mock question
+      let initialTime = 30; // default Part 1.1
+      if (examMode === "mock_running") {
+        initialTime = MOCK_TEST_1[currentQuestionIndex].timeLimit;
+      } else {
+        if (selectedPart === "Part 1.2 (Picture)") initialTime = 45;
+      }
+      setTimeLeft(initialTime);
+
+      const ctx = new AudioContext({ sampleRate: 16000 });
+      setAudioContext(ctx);
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Setup Analyser for real visualizer
+      const analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 64;
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyserNode);
+      setAnalyser(analyserNode);
+      updateVisualizer(analyserNode);
+
+      // Setup Local Recording for playback
+      chunksRef.current = [];
+      pendingAnalysisRef.current = false;
+      setAnalysisResult(null);
+      setRecordedChunks([]);
+      setUserAudioUrl(null);
+
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        if (isSwitchingModeRef.current) {
+          isSwitchingModeRef.current = false;
+          return;
+        }
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setUserAudioUrl(URL.createObjectURL(blob));
+        setRecordedChunks([...chunksRef.current]);
+
+        if (examMode === "mock_running") {
+          handleMockRecordingStop(blob);
+        } else if (pendingAnalysisRef.current) {
+          handlePracticeRecordingStop(blob);
+          pendingAnalysisRef.current = false;
+        }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+
+      // Setup AudioWorklet for Live API
+      await ctx.audioWorklet.addModule(
+        URL.createObjectURL(
+          new Blob(
+            [
+              `
+        class AudioProcessor extends AudioWorkletProcessor {
+          process(inputs, outputs, parameters) {
+            const input = inputs[0][0];
+            if (input) {
+              const pcm = new Int16Array(input.length);
+              for (let i = 0; i < input.length; i++) {
+                pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+              }
+              this.port.postMessage(pcm);
+            }
+            return true;
+          }
+        }
+        registerProcessor('audio-processor', AudioProcessor);
+      `,
+            ],
+            { type: "application/javascript" },
+          ),
+        ),
+      );
+
+      const processor = new AudioWorkletNode(ctx, "audio-processor");
+      source.connect(processor);
+      setAudioWorkletNode(processor);
+
+      const sessionPromise = gemini.connectLive({
+        onopen: () => {
+          setIsLive(true);
+          setIsStartingLive(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "model",
+              text: "[Live Session Started] Hello! I'm listening. Speak naturally.",
+              timestamp: Date.now(),
+            },
+          ]);
+        },
+        onmessage: async (message) => {
+          if (message.serverContent?.modelTurn?.parts) {
+            const parts = message.serverContent.modelTurn.parts;
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                const base64 = part.inlineData.data;
+                const binary = atob(base64);
+                const pcm = new Int16Array(binary.length / 2);
+                for (let i = 0; i < pcm.length; i++) {
+                  pcm[i] =
+                    binary.charCodeAt(i * 2) |
+                    (binary.charCodeAt(i * 2 + 1) << 8);
+                }
+                playAudioChunk(pcm, ctx);
+              }
+              if (part.text) {
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "model", text: part.text, timestamp: Date.now() },
+                ]);
+              }
+            }
+          }
+        },
+        onerror: (err) => {
+          console.error("Live Error:", err);
+          setIsStartingLive(false);
+        },
+        onclose: () => {
+          setIsLive(false);
+          setIsStartingLive(false);
+        },
+      });
+
+      processor.port.onmessage = (e) => {
+        const pcm = e.data;
+        const bytes = new Uint8Array(pcm.buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        sessionPromise
+          .then((session) => {
+            session.sendRealtimeInput({
+              audio: { data: base64, mimeType: "audio/pcm;rate=16000" },
+            });
+          })
+          .catch((err) => console.error(err));
+      };
+
+      setSession(sessionPromise);
+    } catch (err) {
+      console.error("Live Session Error:", err);
+      setIsStartingLive(false);
+    }
+  };
+
+  const stopLiveSession = async (analyzeAfter = false) => {
+    pendingAnalysisRef.current = analyzeAfter;
+    if (session) {
+      try {
+        const s = await session;
+        s.close();
+      } catch (e) {}
+    }
+    if (audioContext && audioContext.state !== "closed") {
+      audioContext.close().catch(() => {});
+    }
+    if (animationFrameRef.current)
+      cancelAnimationFrame(animationFrameRef.current);
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    setIsLive(false);
+    setIsStartingLive(false);
+    setSession(null);
+    setTimeLeft(null);
+    setVisualizerData(new Uint8Array(0));
+  };
+
+  const handleAnalyze = () => {
+    if (recordedChunks.length === 0) return;
+    const blob = new Blob(recordedChunks, { type: "audio/webm" });
+    handlePracticeRecordingStop(blob);
+  };
+
+  const startPrepOrLive = () => {
+    const currentQ = MOCK_TEST_1[currentQuestionIndex];
+    if (examMode === "mock_running" && currentQ.prepTime && !isPrepTime) {
+      setIsPrepTime(true);
+      setPrepTimeLeft(currentQ.prepTime);
+    } else {
+      startLiveSession();
+    }
+  };
+
+  const handleReviewNext = () => {
+    if (currentQuestionIndex < MOCK_TEST_1.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setExamMode("mock_running");
+    } else {
+      setExamMode("mock_finished");
+    }
+  };
+
+  const playAudioChunk = (pcm: Int16Array, ctx: AudioContext) => {
+    const buffer = ctx.createBuffer(1, pcm.length, 16000);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) {
+      data[i] = pcm[i] / 0x7fff;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F4F6F8] text-[#1E293B] font-sans pb-12 selection:bg-[#1E73BE]/30">
+      <HistorySidebar 
+        refreshTrigger={historyRefreshTrigger} 
+        onOpenAITeacher={(answer) => {
+          setInitialSelectedAnswer(answer);
+          setIsAITeacherOpen(true);
+        }} 
+      />
+      <AITeacherPanel 
+        isOpen={isAITeacherOpen} 
+        onClose={() => {
+          setIsAITeacherOpen(false);
+          setInitialSelectedAnswer(null);
+        }} 
+        initialSelectedAnswer={initialSelectedAnswer}
+      />
+      
+      {/* Floating AI Teacher Button */}
+      {!isAITeacherOpen && (
+        <button
+          onClick={() => setIsAITeacherOpen(true)}
+          className="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 transition-all hover:scale-105 z-40 flex items-center gap-2 group"
+        >
+          <Bot size={24} />
+          <span className="font-bold hidden group-hover:block pr-2">AI Teacher</span>
+        </button>
+      )}
+
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#1E73BE] text-white px-2 py-1 rounded text-xs font-bold">
+            ML
+          </div>
+          <span className="font-bold text-[#1E293B] tracking-wide">
+            MULTI-LEVEL
+          </span>
+        </div>
+        <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => {
+              isSwitchingModeRef.current = true;
+              stopLiveSession();
+              setIsPrepTime(false);
+              setPrepTimeLeft(null);
+              setExamMode("practice");
+            }}
+            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode === "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+          >
+            Practice Mode
+          </button>
+          <button
+            onClick={() => {
+              isSwitchingModeRef.current = true;
+              stopLiveSession();
+              setIsPrepTime(false);
+              setPrepTimeLeft(null);
+              setExamMode("mock_setup");
+            }}
+            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode !== "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+          >
+            Mock Exam
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-bold text-[#1E293B]">Candidate</div>
+            <div className="text-xs text-gray-500">+998907252040</div>
+          </div>
+          <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white">
+            <User size={18} />
+          </div>
+        </div>
+      </header>
+
+      {examMode === "practice" && (
+        <>
+          {/* Progress Steps */}
+          <div className="max-w-4xl mx-auto px-6 my-8">
+            <div className="flex items-center justify-between relative">
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 z-0"></div>
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1/3 h-1 bg-[#218838] z-0"></div>
+
+              <div className="w-10 h-10 bg-[#218838] text-white rounded flex items-center justify-center font-bold z-10 relative">
+                1
+              </div>
+              <div className="w-10 h-10 bg-[#1E73BE] text-white rounded flex items-center justify-center font-bold z-10 relative">
+                2
+              </div>
+              <div className="w-10 h-10 bg-[#1E73BE] text-white rounded flex items-center justify-center font-bold z-10 relative">
+                3
+              </div>
+            </div>
+          </div>
+
+          {/* Main Exam Card */}
+          <main className="max-w-5xl mx-auto px-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {/* Card Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-b border-gray-200 bg-white gap-4">
+                <div className="font-bold text-[#1E293B]">
+                  <select
+                    value={selectedPart}
+                    onChange={(e) => setSelectedPart(e.target.value)}
+                    className="bg-transparent outline-none cursor-pointer uppercase"
+                  >
+                    <option value="Part 1.1 (Personal)">PART-1.1</option>
+                    <option value="Part 1.2 (Picture)">PART-1.2</option>
+                  </select>
+                </div>
+                <div className="text-sm text-gray-500 border border-gray-200 px-4 py-1.5 rounded bg-gray-50">
+                  По умолчанию - Набор микрофонов...
+                </div>
+              </div>
+              <div className="h-1 w-full bg-[#E87722]"></div>
+
+              {/* Card Body */}
+              <div className="p-8 md:p-12 flex flex-col items-center">
+                <div className="flex items-center gap-3 mb-6 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
+                  <Bot size={24} className="text-indigo-600" />
+                  <span className="text-indigo-900 font-bold text-sm tracking-wide uppercase">
+                    Super AI Examiner
+                  </span>
+                </div>
+                <h2 className="text-[#E87722] font-bold text-xl mb-4 tracking-wide uppercase">
+                  Practice Mode
+                </h2>
+                <p className="text-[#1E293B] font-bold text-2xl md:text-3xl mb-12 text-center max-w-3xl">
+                  {messages
+                    .filter((m) => m.role === "model")
+                    .pop()
+                    ?.text?.replace(
+                      "[Live Session Started] Hello! I'm listening. Speak naturally.",
+                      "Do you prefer desktops or laptops?",
+                    ) || "Do you prefer desktops or laptops?"}
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
+                  {/* Think Time */}
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <AlertTriangle size={32} className="text-[#1E293B]" />
+                    <div className="text-[#1E293B] font-bold">
+                      O'ylash uchun
+                    </div>
+                    <div className="text-[#1E73BE] font-bold text-xl">
+                      0 second
+                    </div>
+                  </div>
+
+                  {/* Visualizer & Record Button */}
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="flex items-end gap-1 h-24 justify-center w-full">
+                      {isLive
+                        ? Array.from(visualizerData)
+                            .slice(0, 24)
+                            .map((value, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  height: `${Math.max(10, (value / 255) * 100)}%`,
+                                }}
+                                className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
+                              />
+                            ))
+                        : Array.from({ length: 24 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
+                            />
+                          ))}
+                    </div>
+
+                    {!isLive && !isStartingLive ? (
+                      <button
+                        onClick={startLiveSession}
+                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                      >
+                        <Mic size={20} />
+                        JAVOB BERISHNI BOSHLASH
+                      </button>
+                    ) : isStartingLive ? (
+                      <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                        <Loader2 size={20} className="animate-spin" />
+                        ULANMOQDA...
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => stopLiveSession(true)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
+                      >
+                        <Square size={20} fill="currentColor" />
+                        YAKUNLASH VA TAHLIL QILISH
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Speak Time */}
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Clock size={32} className="text-[#1E293B]" />
+                    <div className="text-[#1E293B] font-bold">
+                      Javob berish uchun
+                    </div>
+                    <div
+                      className={`font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                    >
+                      {timeLeft !== null ? `${timeLeft} second` : "0 second"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex flex-wrap justify-center gap-4 mt-8">
+              <button className="flex items-center gap-2 border-2 border-[#E87722] text-[#E87722] hover:bg-[#E87722] hover:text-white px-8 py-2.5 rounded font-bold transition-colors">
+                <LogOut size={18} />
+                Chiqish
+              </button>
+              {(recordedChunks.length > 0 || analysisResult) && (
+                <button
+                  onClick={() => {
+                    stopLiveSession();
+                    setUserAudioUrl(null);
+                    setRecordedChunks([]);
+                    setAnalysisResult(null);
+                  }}
+                  className="flex items-center gap-2 border-2 border-[#1E73BE] text-[#1E73BE] hover:bg-[#1E73BE] hover:text-white px-8 py-2.5 rounded font-bold transition-colors"
+                >
+                  <RotateCcw size={18} />
+                  Qayta topshirish
+                </button>
+              )}
+            </div>
+
+            {/* Analysis Results */}
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-12 bg-white rounded-xl shadow-lg border border-indigo-100 p-8 flex flex-col items-center justify-center gap-4"
+              >
+                <div className="relative">
+                  <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                  <Bot
+                    size={48}
+                    className="text-indigo-600 relative z-10 animate-bounce"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-indigo-900">
+                  Super AI Agent tahlil qilmoqda...
+                </h3>
+                <p className="text-gray-500 text-center max-w-md">
+                  Iltimos kuting, sizning javobingiz Multi-level mezonlari
+                  asosida tekshirilmoqda.
+                </p>
+              </motion.div>
+            )}
+
+            {analysisResult && !isTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-12 bg-white rounded-xl shadow-xl border border-indigo-200 overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6 text-white flex items-center gap-4">
+                  <div className="bg-white/20 p-3 rounded-lg backdrop-blur-sm">
+                    <Bot size={32} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">
+                      Super AI Agent Tahlili
+                    </h3>
+                    <p className="text-indigo-100 text-sm">
+                      Sizning javobingiz Multi-level mezonlari asosida baholandi
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  {userAudioUrl && (
+                    <div className="mb-8 p-5 bg-gray-50 rounded-xl border border-gray-200 flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-indigo-700 font-bold uppercase tracking-wider text-sm">
+                        <Play size={16} />
+                        Sizning ovozingiz:
+                      </div>
+                      <audio src={userAudioUrl} controls className="w-full" />
+                    </div>
+                  )}
+
+                  <div className="markdown-body prose prose-indigo max-w-none prose-headings:text-indigo-900 prose-strong:text-indigo-800 prose-a:text-blue-600">
+                    <ReactMarkdown>{analysisResult}</ReactMarkdown>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </main>
+        </>
+      )}
+      {examMode === "mock_setup" && (
+        <main className="max-w-3xl mx-auto px-6 mt-12">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 md:p-12 text-center">
+            <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Award size={40} />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Multi-level Speaking Mock Test 1
+            </h1>
+            <p className="text-gray-500 mb-8 max-w-lg mx-auto">
+              Ushbu mock test haqiqiy imtihon formatida bo'lib, Part 1.1, Part
+              1.2, Part 2 va Part 3 larni o'z ichiga oladi.
+            </p>
+
+            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8 text-left">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Settings size={20} className="text-indigo-600" />
+                Tahlil sozlamalari
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Super AI Agent tahlilini qachon ko'rishni xohlaysiz?
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
+                  <input
+                    type="radio"
+                    name="analysisPref"
+                    checked={analysisPreference === "each_question"}
+                    onChange={() => setAnalysisPreference("each_question")}
+                    className="w-5 h-5 text-indigo-600"
+                  />
+                  <span className="font-medium">Har bir savoldan keyin</span>
+                </label>
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
+                  <input
+                    type="radio"
+                    name="analysisPref"
+                    checked={analysisPreference === "each_part"}
+                    onChange={() => setAnalysisPreference("each_part")}
+                    className="w-5 h-5 text-indigo-600"
+                  />
+                  <span className="font-medium">
+                    Har bir qismdan (Part) keyin
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
+                  <input
+                    type="radio"
+                    name="analysisPref"
+                    checked={analysisPreference === "end_of_mock"}
+                    onChange={() => setAnalysisPreference("end_of_mock")}
+                    className="w-5 h-5 text-indigo-600"
+                  />
+                  <span className="font-medium">
+                    Mock test oxirida (Tavsiya etiladi)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setCurrentQuestionIndex(0);
+                setMockAnswers([]);
+                setExamMode("mock_running");
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg shadow-indigo-200"
+            >
+              Mock Testni Boshlash
+            </button>
+          </div>
+        </main>
+      )}
+
+      {examMode === "mock_running" && (
+        <main className="max-w-5xl mx-auto px-6 mt-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
+              <div className="font-bold text-[#1E293B] uppercase">
+                {MOCK_TEST_1[currentQuestionIndex].part}
+              </div>
+              <div className="text-sm font-bold text-indigo-600">
+                Savol {currentQuestionIndex + 1} / {MOCK_TEST_1.length}
+              </div>
+            </div>
+            <div className="h-1 w-full bg-[#E87722]"></div>
+
+            <div className="p-8 md:p-12 flex flex-col items-center">
+              <div className="flex items-center gap-3 mb-6 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
+                <Bot size={24} className="text-indigo-600" />
+                <span className="text-indigo-900 font-bold text-sm tracking-wide uppercase">
+                  Super AI Examiner
+                </span>
+              </div>
+
+              {MOCK_TEST_1[currentQuestionIndex].imageUrl && (
+                <img
+                  src={MOCK_TEST_1[currentQuestionIndex].imageUrl}
+                  alt="Exam prompt"
+                  className="max-w-md w-full rounded-lg shadow-md mb-8 object-cover max-h-64"
+                />
+              )}
+
+              <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-12 text-center max-w-3xl whitespace-pre-line">
+                {MOCK_TEST_1[currentQuestionIndex].text}
+              </div>
+
+              {MOCK_TEST_1[currentQuestionIndex].part3Data && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
+                  <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+                    <h4 className="font-bold text-green-800 mb-3">FOR</h4>
+                    <ul className="list-disc pl-5 space-y-2 text-green-900">
+                      {MOCK_TEST_1[currentQuestionIndex].part3Data?.for.map(
+                        (point, i) => (
+                          <li key={i}>{point}</li>
+                        ),
+                      )}
+                    </ul>
+                  </div>
+                  <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+                    <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
+                    <ul className="list-disc pl-5 space-y-2 text-red-900">
+                      {MOCK_TEST_1[currentQuestionIndex].part3Data?.against.map(
+                        (point, i) => (
+                          <li key={i}>{point}</li>
+                        ),
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
+                {/* Think Time */}
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <AlertTriangle size={32} className="text-[#1E293B]" />
+                  <div className="text-[#1E293B] font-bold">O'ylash uchun</div>
+                  <div
+                    className={`font-bold text-xl ${isPrepTime ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                  >
+                    {isPrepTime
+                      ? `${prepTimeLeft} second`
+                      : MOCK_TEST_1[currentQuestionIndex].prepTime
+                        ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} second`
+                        : "0 second"}
+                  </div>
+                </div>
+
+                {/* Visualizer & Record Button */}
+                <div className="flex flex-col items-center gap-6">
+                  <div className="flex items-end gap-1 h-24 justify-center w-full">
+                    {isLive
+                      ? Array.from(visualizerData)
+                          .slice(0, 24)
+                          .map((value, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                height: `${Math.max(10, (value / 255) * 100)}%`,
+                              }}
+                              className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
+                            />
+                          ))
+                      : Array.from({ length: 24 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
+                          />
+                        ))}
+                  </div>
+
+                  {!isLive && !isPrepTime && !isStartingLive ? (
+                    <button
+                      onClick={startPrepOrLive}
+                      className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      {MOCK_TEST_1[currentQuestionIndex].prepTime ? (
+                        <>
+                          <Timer size={20} /> TAYYORGARLIKNI BOSHLASH
+                        </>
+                      ) : (
+                        <>
+                          <Mic size={20} /> JAVOB BERISHNI BOSHLASH
+                        </>
+                      )}
+                    </button>
+                  ) : isStartingLive ? (
+                    <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                      <Loader2 size={20} className="animate-spin" />
+                      ULANMOQDA...
+                    </div>
+                  ) : isPrepTime ? (
+                    <div className="bg-orange-100 text-orange-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                      <Timer size={20} className="animate-spin-slow" />
+                      TAYYORGARLIK VAQTI...
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => stopLiveSession(true)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
+                    >
+                      <Square size={20} fill="currentColor" />
+                      YAKUNLASH
+                    </button>
+                  )}
+                </div>
+
+                {/* Speak Time */}
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <Clock size={32} className="text-[#1E293B]" />
+                  <div className="text-[#1E293B] font-bold">
+                    Javob berish uchun
+                  </div>
+                  <div
+                    className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                  >
+                    {isLive && timeLeft !== null
+                      ? `${timeLeft} second`
+                      : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} second`}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {(examMode === "mock_review" || examMode === "mock_finished") && (
+        <main className="max-w-5xl mx-auto px-6 mt-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 md:p-12">
+            <h2 className="text-3xl font-bold text-indigo-900 mb-8 text-center">
+              {examMode === "mock_finished"
+                ? "Mock Test Natijalari"
+                : "Tahlil Natijalari"}
+            </h2>
+
+            <div className="space-y-8">
+              {mockAnswers.map((answer, idx) => {
+                if (!answer) return null;
+                const q = MOCK_TEST_1[idx];
+                // Filter logic
+                if (examMode === "mock_review") {
+                  if (
+                    analysisPreference === "each_question" &&
+                    idx !== currentQuestionIndex
+                  )
+                    return null;
+                  if (
+                    analysisPreference === "each_part" &&
+                    q.part !== MOCK_TEST_1[currentQuestionIndex].part
+                  )
+                    return null;
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className="bg-gray-50 rounded-xl border border-gray-200 p-6"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-bold">
+                        {q.part}
+                      </span>
+                      <span className="text-gray-500 font-medium text-sm">
+                        Savol {idx + 1}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-xl text-gray-900 mb-6 whitespace-pre-line">
+                      {q.text}
+                    </h3>
+
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 text-indigo-700 font-bold uppercase tracking-wider text-sm mb-3">
+                        <Play size={16} /> Sizning ovozingiz:
+                      </div>
+                      <audio
+                        src={answer.audioUrl}
+                        controls
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="bg-white rounded-lg p-6 border border-indigo-100 shadow-sm">
+                      <div className="flex items-center gap-2 text-indigo-700 font-bold uppercase tracking-wider text-sm mb-4">
+                        <Bot size={18} /> Super AI Agent Tahlili:
+                      </div>
+                      {answer.isAnalyzing ? (
+                        <div className="flex items-center gap-3 text-indigo-600 py-4">
+                          <Loader2 size={24} className="animate-spin" />
+                          <span className="font-medium">
+                            Tahlil qilinmoqda...
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="markdown-body prose prose-indigo max-w-none prose-sm md:prose-base">
+                          <ReactMarkdown>{answer.analysis || ""}</ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-12 flex justify-center">
+              {examMode === "mock_review" ? (
+                <button
+                  onClick={handleReviewNext}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg"
+                >
+                  {currentQuestionIndex < MOCK_TEST_1.length - 1
+                    ? analysisPreference === "each_part"
+                      ? "Keyingi Bosqich"
+                      : "Keyingi Savol"
+                    : "Natijalarni Ko'rish"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setExamMode("mock_setup")}
+                  className="bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg flex items-center gap-2"
+                >
+                  <RotateCcw size={20} />
+                  Yangi Mock Test Boshlash
+                </button>
+              )}
+            </div>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+};
+
+export default function App() {
+  return <LessonLabAssistant />;
+}
