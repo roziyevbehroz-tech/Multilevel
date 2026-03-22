@@ -44,25 +44,25 @@ export type MockQuestion = {
 const MOCK_TEST_1: MockQuestion[] = [
   {
     id: "1.1.1",
-    part: "Part 1.1",
+    part: "Qism 1.1",
     text: "What do you do on weekends?",
     timeLimit: 30,
   },
   {
     id: "1.1.2",
-    part: "Part 1.1",
+    part: "Qism 1.1",
     text: "What is your favourite drink?",
     timeLimit: 30,
   },
   {
     id: "1.1.3",
-    part: "Part 1.1",
+    part: "Qism 1.1",
     text: "Do you wake up early?",
     timeLimit: 30,
   },
   {
     id: "1.2.1",
-    part: "Part 1.2",
+    part: "Qism 1.2",
     text: "What do you see in these pictures?",
     timeLimit: 45,
     imageUrls: [
@@ -72,32 +72,31 @@ const MOCK_TEST_1: MockQuestion[] = [
   },
   {
     id: "1.2.2",
-    part: "Part 1.2",
+    part: "Qism 1.2",
     text: "What are the advantages of reading a book over watching a TV?",
     timeLimit: 30,
   },
   {
     id: "1.2.3",
-    part: "Part 1.2",
+    part: "Qism 1.2",
     text: "Do you agree that people read books less now than the past?",
     timeLimit: 30,
   },
   {
     id: "2.1",
-    part: "Part 2",
+    part: "Qism 2",
     text: "Tell me about a moment you had to be honest although it was difficult.\n• How did the other person react to your honesty?\n• Why do you think being honest is important, even in challenging situations?",
     timeLimit: 120,
     prepTime: 60,
     imageUrls: [
-      "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800",
       "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800"
     ],
   },
   {
     id: "3.1",
-    part: "Part 3",
+    part: "Qism 3",
     text: "All students should learn a second language.",
-    timeLimit: 180,
+    timeLimit: 120,
     prepTime: 60,
     part3Data: {
       topic: "All students should learn a second language.",
@@ -128,7 +127,7 @@ const LessonLabAssistant: React.FC = () => {
   ]);
   const [isLive, setIsLive] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedPart, setSelectedPart] = useState("Part 1.1 (Personal)");
+  const [selectedPart, setSelectedPart] = useState("Qism 1.1 (Personal)");
   const [session, setSession] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
@@ -136,7 +135,7 @@ const LessonLabAssistant: React.FC = () => {
   // Mock Exam States
   const [examMode, setExamMode] = useState<
     "practice" | "mock_setup" | "mock_running" | "mock_review" | "mock_finished"
-  >("mock_setup");
+  >("practice");
   const [analysisPreference, setAnalysisPreference] = useState<
     "each_question" | "each_part" | "end_of_mock"
   >("end_of_mock");
@@ -178,6 +177,12 @@ const LessonLabAssistant: React.FC = () => {
   const [isPrepTime, setIsPrepTime] = useState(false);
   const [prepTimeLeft, setPrepTimeLeft] = useState<number | null>(null);
   const [isStartingLive, setIsStartingLive] = useState(false);
+
+  const [isBreakTime, setIsBreakTime] = useState(false);
+  const [breakTimeLeft, setBreakTimeLeft] = useState<number | null>(null);
+  const [mockSessionId, setMockSessionId] = useState<string | null>(null);
+  const [pendingNextQuestion, setPendingNextQuestion] = useState(false);
+  const [isContinuousMockRunning, setIsContinuousMockRunning] = useState(false);
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -237,6 +242,7 @@ const LessonLabAssistant: React.FC = () => {
       const answerId = `answer_${Date.now()}_${currentQ.id}`;
       await localforage.setItem(answerId, {
         id: answerId,
+        sessionId: mockSessionId || undefined,
         questionId: currentQ.id,
         part: currentQ.part,
         questionText: currentQ.text,
@@ -265,11 +271,64 @@ const LessonLabAssistant: React.FC = () => {
     const isLastQuestion = currentQuestionIndex === MOCK_TEST_1.length - 1;
 
     if (!isLastQuestion) {
-      setCurrentQuestionIndex((prev) => prev + 1);
+      const nextQ = MOCK_TEST_1[currentQuestionIndex + 1];
+      if (nextQ.part !== currentQ.part) {
+        setIsBreakTime(true);
+        setBreakTimeLeft(5);
+        setCurrentQuestionIndex((prev) => prev + 1);
+      } else {
+        setCurrentQuestionIndex((prev) => prev + 1);
+        setPendingNextQuestion(true);
+      }
     } else {
       setExamMode("mock_finished");
+      setIsContinuousMockRunning(false);
+      
+      // Create Full Mock Feedback entry
+      const fullMockId = `answer_${Date.now()}_full_mock`;
+      localforage.setItem(fullMockId, {
+        id: fullMockId,
+        sessionId: mockSessionId || undefined,
+        questionId: "full_mock",
+        part: "Full Mock Feedback",
+        questionText: "Multi-level Speaking Mock Test 1 - Yakuniy Xulosa",
+        audioUrl: null,
+        audioBlob: null,
+        transcript: null,
+        analysis: null,
+        timestamp: Date.now(),
+      }).then(() => {
+        setHistoryRefreshTrigger(prev => prev + 1);
+      }).catch(err => console.error("Error saving full mock feedback item:", err));
     }
   };
+
+  useEffect(() => {
+    if (isBreakTime && breakTimeLeft !== null) {
+      if (breakTimeLeft <= 0) {
+        setIsBreakTime(false);
+        setPendingNextQuestion(true);
+        return;
+      }
+      const timer = setInterval(() => {
+        setBreakTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isBreakTime, breakTimeLeft]);
+
+  useEffect(() => {
+    if (pendingNextQuestion && !isBreakTime) {
+      setPendingNextQuestion(false);
+      const currentQ = MOCK_TEST_1[currentQuestionIndex];
+      if (currentQ.prepTime) {
+        setIsPrepTime(true);
+        setPrepTimeLeft(currentQ.prepTime);
+      } else {
+        startLiveSession();
+      }
+    }
+  }, [currentQuestionIndex, pendingNextQuestion, isBreakTime]);
 
   useEffect(() => {
     if (isPrepTime && prepTimeLeft !== null) {
@@ -320,11 +379,11 @@ const LessonLabAssistant: React.FC = () => {
     setIsStartingLive(true);
     try {
       // Set initial time based on selected part or mock question
-      let initialTime = 30; // default Part 1.1
+      let initialTime = 30; // default Qism 1.1
       if (examMode === "mock_running") {
         initialTime = MOCK_TEST_1[currentQuestionIndex].timeLimit;
       } else {
-        if (selectedPart === "Part 1.2 (Picture)") initialTime = 45;
+        if (selectedPart === "Qism 1.2 (Picture)") initialTime = 45;
       }
       setTimeLeft(initialTime);
 
@@ -446,6 +505,9 @@ const LessonLabAssistant: React.FC = () => {
         onclose: () => {
           setIsLive(false);
           setIsStartingLive(false);
+          if (examMode === "mock_running" && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            stopLiveSession(true);
+          }
         },
       };
 
@@ -477,6 +539,29 @@ const LessonLabAssistant: React.FC = () => {
 
   const stopLiveSession = async (analyzeAfter = false) => {
     pendingAnalysisRef.current = analyzeAfter;
+    
+    let onStopWillFire = false;
+    
+    // Stop recording immediately to ensure onstop fires
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+        onStopWillFire = true;
+      }
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+    
+    // If we are supposed to analyze/advance, but onstop won't fire,
+    // we must manually advance to prevent getting stuck.
+    if (analyzeAfter && !onStopWillFire) {
+      const blob = new Blob(recordedChunks, { type: "audio/webm" });
+      if (examMode === "mock_running") {
+        handleMockRecordingStop(blob);
+      } else {
+        handlePracticeRecordingStop(blob);
+      }
+    }
+    
     if (session) {
       try {
         const s = await session;
@@ -488,12 +573,7 @@ const LessonLabAssistant: React.FC = () => {
     }
     if (animationFrameRef.current)
       cancelAnimationFrame(animationFrameRef.current);
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop();
-    }
+      
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setIsLive(false);
     setIsStartingLive(false);
@@ -600,7 +680,13 @@ const LessonLabAssistant: React.FC = () => {
               stopLiveSession();
               setIsPrepTime(false);
               setPrepTimeLeft(null);
-              setExamMode("mock_setup");
+              setMockSessionId(Date.now().toString());
+              setCurrentQuestionIndex(0);
+              setMockAnswers([]);
+              setExamMode("mock_running");
+              setIsBreakTime(false);
+              setBreakTimeLeft(null);
+              setIsContinuousMockRunning(false);
             }}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode !== "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
           >
@@ -630,15 +716,15 @@ const LessonLabAssistant: React.FC = () => {
               <motion.div 
                 className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-indigo-600 z-0"
                 initial={{ width: "0%" }}
-                animate={{ width: selectedPart.includes("Part 1") ? "33%" : selectedPart.includes("Part 2") ? "66%" : "100%" }}
+                animate={{ width: selectedPart.includes("Qism 1") ? "33%" : selectedPart.includes("Qism 2") ? "66%" : "100%" }}
                 transition={{ duration: 0.5 }}
               ></motion.div>
 
               {[1, 2, 3].map((part) => (
                 <div key={part} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold z-10 relative transition-colors ${
-                  (part === 1 && selectedPart.includes("Part 1")) || 
-                  (part === 2 && selectedPart.includes("Part 2")) || 
-                  (part === 3 && selectedPart.includes("Part 3")) 
+                  (part === 1 && selectedPart.includes("Qism 1")) || 
+                  (part === 2 && selectedPart.includes("Qism 2")) || 
+                  (part === 3 && selectedPart.includes("Qism 3")) 
                   ? "bg-indigo-600 text-white" : "bg-white border-2 border-indigo-600 text-indigo-600"
                 }`}>
                   {part}
@@ -658,10 +744,10 @@ const LessonLabAssistant: React.FC = () => {
                     onChange={(e) => setSelectedPart(e.target.value)}
                     className="bg-transparent outline-none cursor-pointer uppercase text-indigo-700 font-bold"
                   >
-                    <option value="Part 1.1 (Personal)">PART-1.1</option>
-                    <option value="Part 1.2 (Picture)">PART-1.2</option>
-                    <option value="Part 2 (Cue Card)">PART-2</option>
-                    <option value="Part 3 (Discussion)">PART-3</option>
+                    <option value="Qism 1.1 (Personal)">QISM 1.1</option>
+                    <option value="Qism 1.2 (Picture)">QISM 1.2</option>
+                    <option value="Qism 2 (Cue Card)">QISM 2</option>
+                    <option value="Qism 3 (Discussion)">QISM 3</option>
                   </select>
                 </div>
                 <div className="text-sm text-gray-500 border border-gray-200 px-4 py-1.5 rounded bg-gray-50">
@@ -794,7 +880,7 @@ const LessonLabAssistant: React.FC = () => {
                     <div
                       className={`font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
-                      {timeLeft !== null ? `${timeLeft} second` : `${selectedPart === "Part 1.2 (Picture)" ? 45 : 30} second`}
+                      {timeLeft !== null ? `${timeLeft} second` : `${selectedPart === "Qism 1.2 (Picture)" ? 45 : 30} second`}
                     </div>
                   </div>
                 </div>
@@ -846,79 +932,6 @@ const LessonLabAssistant: React.FC = () => {
           </main>
         </>
       )}
-      {examMode === "mock_setup" && (
-        <main className="max-w-3xl mx-auto px-6 mt-12">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 md:p-12 text-center">
-            <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Award size={40} />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Multi-level Speaking Mock Test 1
-            </h1>
-            <p className="text-gray-500 mb-8 max-w-lg mx-auto">
-              Ushbu mock test haqiqiy imtihon formatida bo'lib, Part 1.1, Part
-              1.2, Part 2 va Part 3 larni o'z ichiga oladi.
-            </p>
-            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8 text-left">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Settings size={20} className="text-indigo-600" />
-                Tahlil sozlamalari
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Super AI Agent tahlilini qachon ko'rishni xohlaysiz?
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                  <input
-                    type="radio"
-                    name="analysisPref"
-                    checked={analysisPreference === "each_question"}
-                    onChange={() => setAnalysisPreference("each_question")}
-                    className="w-5 h-5 text-indigo-600"
-                  />
-                  <span className="font-medium">Har bir savoldan keyin</span>
-                </label>
-                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                  <input
-                    type="radio"
-                    name="analysisPref"
-                    checked={analysisPreference === "each_part"}
-                    onChange={() => setAnalysisPreference("each_part")}
-                    className="w-5 h-5 text-indigo-600"
-                  />
-                  <span className="font-medium">
-                    Har bir qismdan (Part) keyin
-                  </span>
-                </label>
-                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                  <input
-                    type="radio"
-                    name="analysisPref"
-                    checked={analysisPreference === "end_of_mock"}
-                    onChange={() => setAnalysisPreference("end_of_mock")}
-                    className="w-5 h-5 text-indigo-600"
-                  />
-                  <span className="font-medium">
-                    Mock test oxirida (Tavsiya etiladi)
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setCurrentQuestionIndex(0);
-                setMockAnswers([]);
-                setExamMode("mock_running");
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg shadow-indigo-200"
-            >
-              Mock Testni Boshlash
-            </button>
-          </div>
-        </main>
-      )}
 
       {examMode === "mock_running" && (
         <main className="max-w-5xl mx-auto px-6 mt-8">
@@ -941,151 +954,155 @@ const LessonLabAssistant: React.FC = () => {
                 </span>
               </div>
 
-              {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
-                  {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
-                    <img
-                      key={index}
-                      src={url}
-                      alt={`Exam prompt ${index + 1}`}
-                      className="w-full rounded-lg shadow-md object-cover h-64"
-                      referrerPolicy="no-referrer"
-                    />
-                  ))}
+              {isBreakTime ? (
+                <div className="text-center py-16">
+                  <h2 className="text-3xl font-bold text-indigo-600 mb-4 animate-pulse">
+                    Keyingi: {MOCK_TEST_1[currentQuestionIndex].part}
+                  </h2>
+                  <p className="text-xl text-gray-500 mb-8">Nafas rostlab oling...</p>
+                  <div className="text-6xl font-bold text-indigo-600 mb-8">
+                    {breakTimeLeft}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
+                      {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
+                        <img
+                          key={index}
+                          src={url}
+                          alt={`Exam prompt ${index + 1}`}
+                          className="w-full rounded-lg shadow-md object-cover h-64"
+                          referrerPolicy="no-referrer"
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-12 text-center max-w-3xl whitespace-pre-line">
+                    {MOCK_TEST_1[currentQuestionIndex].text}
+                  </div>
+
+                  {MOCK_TEST_1[currentQuestionIndex].part3Data && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
+                      <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+                        <h4 className="font-bold text-green-800 mb-3">FOR</h4>
+                        <ul className="list-disc pl-5 space-y-2 text-green-900">
+                          {MOCK_TEST_1[currentQuestionIndex].part3Data?.for.map(
+                            (point, i) => (
+                              <li key={i}>{point}</li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                      <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+                        <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
+                        <ul className="list-disc pl-5 space-y-2 text-red-900">
+                          {MOCK_TEST_1[currentQuestionIndex].part3Data?.against.map(
+                            (point, i) => (
+                              <li key={i}>{point}</li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-12 text-center max-w-3xl whitespace-pre-line">
-                {MOCK_TEST_1[currentQuestionIndex].text}
-              </div>
-
-              {MOCK_TEST_1[currentQuestionIndex].part3Data && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
-                  <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                    <h4 className="font-bold text-green-800 mb-3">FOR</h4>
-                    <ul className="list-disc pl-5 space-y-2 text-green-900">
-                      {MOCK_TEST_1[currentQuestionIndex].part3Data?.for.map(
-                        (point, i) => (
-                          <li key={i}>{point}</li>
-                        ),
-                      )}
-                    </ul>
+              {!isBreakTime && (
+                <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
+                  {/* Think Time */}
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <AlertTriangle size={32} className="text-[#1E293B]" />
+                    <div className="text-[#1E293B] font-bold">O'ylash uchun</div>
+                    <div
+                      className={`font-bold text-xl ${isPrepTime ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                    >
+                      {isPrepTime
+                        ? `${prepTimeLeft} second`
+                        : MOCK_TEST_1[currentQuestionIndex].prepTime
+                          ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} second`
+                          : "Yo'q"}
+                    </div>
                   </div>
-                  <div className="bg-red-50 p-6 rounded-xl border border-red-200">
-                    <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
-                    <ul className="list-disc pl-5 space-y-2 text-red-900">
-                      {MOCK_TEST_1[currentQuestionIndex].part3Data?.against.map(
-                        (point, i) => (
-                          <li key={i}>{point}</li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
-                {/* Think Time */}
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <AlertTriangle size={32} className="text-[#1E293B]" />
-                  <div className="text-[#1E293B] font-bold">O'ylash uchun</div>
-                  <div
-                    className={`font-bold text-xl ${isPrepTime ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
-                  >
-                    {isPrepTime
-                      ? `${prepTimeLeft} second`
-                      : MOCK_TEST_1[currentQuestionIndex].prepTime
-                        ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} second`
-                        : "0 second"}
-                  </div>
-                </div>
-
-                {/* Visualizer & Record Button */}
-                <div className="flex flex-col items-center gap-6">
-                  <div className="flex items-end gap-1 h-24 justify-center w-full">
-                    {isLive
-                      ? Array.from(visualizerData)
-                          .slice(0, 24)
-                          .map((value, i) => (
+                  {/* Visualizer & Record Button */}
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="flex items-end gap-1 h-24 justify-center w-full">
+                      {isLive
+                        ? Array.from(visualizerData)
+                            .slice(0, 24)
+                            .map((value, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  height: `${Math.max(10, (value / 255) * 100)}%`,
+                                }}
+                                className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
+                              />
+                            ))
+                        : Array.from({ length: 24 }).map((_, i) => (
                             <div
                               key={i}
-                              style={{
-                                height: `${Math.max(10, (value / 255) * 100)}%`,
-                              }}
-                              className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
+                              className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
                             />
-                          ))
-                      : Array.from({ length: 24 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
-                          />
-                        ))}
+                          ))}
+                    </div>
+
+                    {!isContinuousMockRunning ? (
+                      <button
+                        onClick={() => {
+                          setIsContinuousMockRunning(true);
+                          startPrepOrLive();
+                        }}
+                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                      >
+                        BOSHLASH
+                      </button>
+                    ) : isStartingLive ? (
+                      <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                        <Loader2 size={20} className="animate-spin" />
+                        ULANMOQDA...
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (isBreakTime) {
+                            setBreakTimeLeft(0);
+                          } else if (isPrepTime) {
+                            setPrepTimeLeft(0);
+                            setIsPrepTime(false);
+                            startLiveSession();
+                          } else {
+                            stopLiveSession(true);
+                          }
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
+                      >
+                        <Square size={20} fill="currentColor" />
+                        YAKUNLASH
+                      </button>
+                    )}
                   </div>
 
-                  {!isLive && !isPrepTime && !isStartingLive ? (
-                    <button
-                      onClick={startPrepOrLive}
-                      className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
-                    >
-                      {MOCK_TEST_1[currentQuestionIndex].prepTime ? (
-                        <>
-                          <Timer size={20} /> TAYYORGARLIKNI BOSHLASH
-                        </>
-                      ) : (
-                        <>
-                          <Mic size={20} /> JAVOB BERISHNI BOSHLASH
-                        </>
-                      )}
-                    </button>
-                  ) : isStartingLive ? (
-                    <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
-                      <Loader2 size={20} className="animate-spin" />
-                      ULANMOQDA...
+                  {/* Speak Time */}
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Clock size={32} className="text-[#1E293B]" />
+                    <div className="text-[#1E293B] font-bold">
+                      Qolgan vaqt
                     </div>
-                  ) : isPrepTime ? (
-                    <button
-                      onClick={() => {
-                        setPrepTimeLeft(0);
-                        setIsPrepTime(false);
-                        startLiveSession();
-                      }}
-                      className="bg-orange-100 hover:bg-orange-200 text-orange-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg transition-colors"
+                    <div
+                      className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
-                      <Timer size={20} /> TAYYORGARLIKNI TUGATISH
-                    </button>
-                  ) : (
-                    <div className="bg-orange-100 text-orange-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
-                      <Timer size={20} className="animate-spin-slow" />
-                      TAYYORGARLIK VAQTI...
+                      {isLive && timeLeft !== null
+                        ? `${timeLeft} second`
+                        : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} second`}
                     </div>
-                  )}
-                  {isLive && (
-                    <button
-                      onClick={() => stopLiveSession(true)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
-                    >
-                      <Square size={20} fill="currentColor" />
-                      YAKUNLASH
-                    </button>
-                  )}
-                </div>
-
-                {/* Speak Time */}
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <Clock size={32} className="text-[#1E293B]" />
-                  <div className="text-[#1E293B] font-bold">
-                    Qolgan vaqt
-                  </div>
-                  <div
-                    className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
-                  >
-                    {isLive && timeLeft !== null
-                      ? `${timeLeft} second`
-                      : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} second`}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </main>
@@ -1182,7 +1199,17 @@ const LessonLabAssistant: React.FC = () => {
                 </button>
               ) : (
                 <button
-                  onClick={() => setExamMode("mock_setup")}
+                  onClick={() => {
+                    setMockSessionId(Date.now().toString());
+                    setCurrentQuestionIndex(0);
+                    setMockAnswers([]);
+                    setExamMode("mock_running");
+                    setIsBreakTime(false);
+                    setBreakTimeLeft(null);
+                    setIsPrepTime(false);
+                    setPrepTimeLeft(null);
+                    setIsContinuousMockRunning(false);
+                  }}
                   className="bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg flex items-center gap-2"
                 >
                   <RotateCcw size={20} />

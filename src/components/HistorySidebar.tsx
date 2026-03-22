@@ -61,6 +61,33 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
   const handleAnalyze = async (answer: SavedAnswer) => {
     setIsAnalyzing(true);
     try {
+      if (answer.part === "Full Mock Feedback" && answer.sessionId) {
+        // Fetch all answers for this session
+        const sessionAnswers: SavedAnswer[] = [];
+        await localforage.iterate((value: SavedAnswer, key: string) => {
+          if (value.sessionId === answer.sessionId && value.id !== answer.id) {
+            sessionAnswers.push(value);
+          }
+        });
+        
+        // We can't easily send 8 audio files in one go without hitting limits or timeout.
+        // So we'll just ask Gemini to give a general feedback based on the fact that they finished.
+        // Ideally, we would send transcripts, but they might not be generated yet.
+        const context = `Foydalanuvchi to'liq Multi-level Speaking Mock testini (Qism 1.1, 1.2, 2 va 3) yakunladi. 
+        Unga umumiy xulosa, motivatsiya va kelgusi tayyorgarlik uchun strategik maslahatlar ber. 
+        Javobingni o'zbek tilida, do'stona va ruhlantiruvchi ohangda yoz.`;
+        
+        const response = await gemini.generateText(context);
+        const analysisText = response.text || "Tahlil qilib bo'lmadi.";
+        
+        const updatedAnswer = { ...answer, analysis: analysisText };
+        await localforage.setItem(answer.id, updatedAnswer);
+        loadSavedAnswers();
+        return;
+      }
+
+      if (!answer.audioBlob) throw new Error("Audio mavjud emas");
+
       const reader = new FileReader();
       reader.readAsDataURL(answer.audioBlob);
       await new Promise((resolve) => {
@@ -154,10 +181,14 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
                     >
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm space-y-3">
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
-                            <Play size={12} /> Audio
-                          </p>
-                          <audio src={answer.audioUrl} controls className="w-full h-8" />
+                          {answer.audioUrl && (
+                            <>
+                              <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
+                                <Play size={12} /> Audio
+                              </p>
+                              <audio src={answer.audioUrl} controls className="w-full h-8" />
+                            </>
+                          )}
                         </div>
                         
                         <div className="pt-2 border-t border-gray-200">

@@ -18,11 +18,12 @@ export interface Message {
 
 export interface SavedAnswer {
   id: string;
+  sessionId?: string;
   questionId: string;
   part: string;
   questionText: string;
-  audioUrl: string;
-  audioBlob: Blob;
+  audioUrl: string | null;
+  audioBlob: Blob | null;
   transcript: string | null;
   analysis: string | null;
   timestamp: number;
