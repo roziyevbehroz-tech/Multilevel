@@ -339,6 +339,8 @@ const LessonLabAssistant: React.FC = () => {
   const [isContinuousMockRunning, setIsContinuousMockRunning] = useState(false);
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const startLiveSessionRef = useRef<(isTutorMode?: boolean) => void>(() => {});
+  const stopLiveSessionRef = useRef<(analyzeAfter?: boolean) => void>(() => {});
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [visualizerData, setVisualizerData] = useState<Uint8Array>(
@@ -455,64 +457,75 @@ const LessonLabAssistant: React.FC = () => {
     }
   };
 
+  // ═══════════════════════════════════════════════════════
+  // TIMER SYSTEM — robust, single-interval, ref-based
+  // ═══════════════════════════════════════════════════════
+
+  // 1) BREAK TIME countdown (between parts)
   useEffect(() => {
-    if (isBreakTime && breakTimeLeft !== null) {
-      if (breakTimeLeft <= 0) {
-        setIsBreakTime(false);
-        setPendingNextQuestion(true);
-        return;
-      }
-      const timer = setInterval(() => {
-        setBreakTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
+    if (!isBreakTime) return;
+    const timer = setInterval(() => {
+      setBreakTimeLeft(prev => (prev !== null && prev > 0) ? prev - 1 : prev);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isBreakTime]);
+
+  // 1b) Break time expiry → advance to next question
+  useEffect(() => {
+    if (isBreakTime && breakTimeLeft !== null && breakTimeLeft <= 0) {
+      setIsBreakTime(false);
+      setBreakTimeLeft(null);
+      setPendingNextQuestion(true);
     }
   }, [isBreakTime, breakTimeLeft]);
 
+  // 2) PENDING NEXT QUESTION → start prep time
   useEffect(() => {
-    if (pendingNextQuestion && !isBreakTime) {
-      setPendingNextQuestion(false);
-      const currentQ = MOCK_TEST_1[currentQuestionIndex];
-      if (currentQ.prepTime) {
-        setIsPrepTime(true);
-        setPrepTimeLeft(currentQ.prepTime);
-      } else {
-        // Part 1.1 va 1.2 uchun 5 soniya savolni o'qish vaqti
-        setIsPrepTime(true);
-        setPrepTimeLeft(5);
-      }
+    if (!pendingNextQuestion || isBreakTime) return;
+    setPendingNextQuestion(false);
+    const currentQ = MOCK_TEST_1[currentQuestionIndex];
+    if (currentQ.prepTime) {
+      setIsPrepTime(true);
+      setPrepTimeLeft(currentQ.prepTime);
+    } else {
+      // Part 1.1 va 1.2: 5 soniya savolni o'qish vaqti
+      setIsPrepTime(true);
+      setPrepTimeLeft(5);
     }
   }, [currentQuestionIndex, pendingNextQuestion, isBreakTime]);
 
+  // 3) PREP TIME countdown
   useEffect(() => {
-    if (isPrepTime && prepTimeLeft !== null) {
-      if (prepTimeLeft <= 0) {
-        setIsPrepTime(false);
-        startLiveSession();
-        return;
-      }
-      const timer = setInterval(() => {
-        setPrepTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
+    if (!isPrepTime) return;
+    const timer = setInterval(() => {
+      setPrepTimeLeft(prev => (prev !== null && prev > 0) ? prev - 1 : prev);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isPrepTime]);
+
+  // 3b) Prep time expiry → start live recording session
+  useEffect(() => {
+    if (isPrepTime && prepTimeLeft !== null && prepTimeLeft <= 0) {
+      setIsPrepTime(false);
+      setPrepTimeLeft(null);
+      startLiveSessionRef.current();
     }
   }, [isPrepTime, prepTimeLeft]);
 
+  // 4) RECORDING TIME countdown
   useEffect(() => {
-    if (isLive && timeLeft !== null) {
-      if (timeLeft <= 0) {
-        stopLiveSession(true); // Auto-analyze when time is up
-        return;
-      }
-      timerIntervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
-    } else {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (!isLive) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => (prev !== null && prev > 0) ? prev - 1 : prev);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isLive]);
+
+  // 4b) Recording time expiry → auto-stop
+  useEffect(() => {
+    if (isLive && timeLeft !== null && timeLeft <= 0) {
+      stopLiveSessionRef.current(true);
     }
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
   }, [isLive, timeLeft]);
 
   const scrollToBottom = () => {
@@ -737,6 +750,10 @@ const LessonLabAssistant: React.FC = () => {
     setTimeLeft(null);
     setVisualizerData(new Uint8Array(0));
   };
+
+  // Keep function refs updated every render (avoids stale closures in useEffects)
+  useEffect(() => { startLiveSessionRef.current = startLiveSession; });
+  useEffect(() => { stopLiveSessionRef.current = stopLiveSession; });
 
   const generateRandomQuestion = async () => {
     setIsGeneratingQ(true);
@@ -1545,25 +1562,31 @@ AGAINST3: [argument against]`,
                         <Loader2 size={20} className="animate-spin" />
                         ULANMOQDA...
                       </div>
-                    ) : (
+                    ) : isPrepTime || isBreakTime ? (
                       <button
                         onClick={() => {
                           if (isBreakTime) {
                             setBreakTimeLeft(0);
                           } else if (isPrepTime) {
-                            setPrepTimeLeft(0);
                             setIsPrepTime(false);
+                            setPrepTimeLeft(null);
                             startLiveSession();
-                          } else {
-                            stopLiveSession(true);
                           }
                         }}
+                        className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                      >
+                        <ArrowRight size={20} />
+                        {isBreakTime ? "BOSHLASH" : "O'TKAZISH"}
+                      </button>
+                    ) : isLive ? (
+                      <button
+                        onClick={() => stopLiveSession(true)}
                         className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
                       >
                         <Square size={20} fill="currentColor" />
                         YAKUNLASH
                       </button>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Speak Time */}
