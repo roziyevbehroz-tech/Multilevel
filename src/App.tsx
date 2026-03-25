@@ -1580,7 +1580,7 @@ AGAINST3: [argument against]`,
                         className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
                       >
                         <ArrowRight size={20} />
-                        {isBreakTime ? "BOSHLASH" : "O'TKAZISH"}
+                        {isBreakTime ? "BOSHLASH" : "GAPIRISHNI BOSHLASH"}
                       </button>
                     ) : isLive ? (
                       <button
@@ -1596,7 +1596,7 @@ AGAINST3: [argument against]`,
                         className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
                       >
                         <Mic size={20} />
-                        YOZISHNI BOSHLASH
+                        GAPIRISHNI BOSHLASH
                       </button>
                     )}
                   </div>
