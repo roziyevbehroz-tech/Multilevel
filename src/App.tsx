@@ -280,7 +280,6 @@ const LessonLabAssistant: React.FC = () => {
   ]);
   const [isLive, setIsLive] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedPart, setSelectedPart] = useState("Qism 1.1 (Personal)");
   const [session, setSession] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
@@ -478,7 +477,9 @@ const LessonLabAssistant: React.FC = () => {
         setIsPrepTime(true);
         setPrepTimeLeft(currentQ.prepTime);
       } else {
-        startLiveSession();
+        // Part 1.1 va 1.2 uchun 5 soniya savolni o'qish vaqti
+        setIsPrepTime(true);
+        setPrepTimeLeft(5);
       }
     }
   }, [currentQuestionIndex, pendingNextQuestion, isBreakTime]);
@@ -657,7 +658,7 @@ const LessonLabAssistant: React.FC = () => {
         onclose: () => {
           setIsLive(false);
           setIsStartingLive(false);
-          if (examMode === "mock_running" && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             stopLiveSession(true);
           }
         },
@@ -706,11 +707,14 @@ const LessonLabAssistant: React.FC = () => {
     // If we are supposed to analyze/advance, but onstop won't fire,
     // we must manually advance to prevent getting stuck.
     if (analyzeAfter && !onStopWillFire) {
-      const blob = new Blob(recordedChunks, { type: "audio/webm" });
-      if (examMode === "mock_running") {
-        handleMockRecordingStop(blob);
-      } else {
-        handlePracticeRecordingStop(blob);
+      const blob = new Blob(chunksRef.current.length > 0 ? chunksRef.current : recordedChunks, { type: "audio/webm" });
+      if (blob.size > 0) {
+        setUserAudioUrl(URL.createObjectURL(blob));
+        if (examMode === "mock_running") {
+          handleMockRecordingStop(blob);
+        } else if (examMode === "practice") {
+          handlePracticeRecordingStop(blob);
+        }
       }
     }
     
@@ -1444,15 +1448,17 @@ AGAINST3: [argument against]`,
                   {/* Think Time */}
                   <div className="flex flex-col items-center justify-center gap-3">
                     <AlertTriangle size={32} className="text-[#1E293B]" />
-                    <div className="text-[#1E293B] font-bold">O'ylash uchun</div>
+                    <div className="text-[#1E293B] font-bold">
+                      {isPrepTime && !MOCK_TEST_1[currentQuestionIndex].prepTime ? "Savolni o'qing" : "O'ylash uchun"}
+                    </div>
                     <div
-                      className={`font-bold text-xl ${isPrepTime ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                      className={`font-bold text-xl ${isPrepTime ? "text-amber-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
                       {isPrepTime
                         ? `${prepTimeLeft} soniya`
                         : MOCK_TEST_1[currentQuestionIndex].prepTime
                           ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} soniya`
-                          : "Yo'q"}
+                          : "5 soniya"}
                     </div>
                   </div>
 
