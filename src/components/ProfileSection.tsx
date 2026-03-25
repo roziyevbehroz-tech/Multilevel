@@ -1,4 +1,5 @@
 import React from 'react';
+import localforage from 'localforage';
 import { UserProfile, CEFRLevel } from '../types';
 
 interface ProfileSectionProps {
@@ -8,11 +9,16 @@ interface ProfileSectionProps {
 }
 
 export const ProfileSection: React.FC<ProfileSectionProps> = ({ profile, setProfile, onClose }) => {
+  const handleSave = async () => {
+    await localforage.setItem('user_profile', profile);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-xl">
         <h2 className="text-2xl font-bold mb-6">Profil sozlamalari</h2>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ismingiz</label>
@@ -20,7 +26,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ profile, setProf
               type="text"
               value={profile.name}
               onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -52,8 +58,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ profile, setProf
         </div>
 
         <button
-          onClick={onClose}
-          className="mt-8 w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700"
+          onClick={handleSave}
+          className="mt-8 w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors"
         >
           Saqlash
         </button>

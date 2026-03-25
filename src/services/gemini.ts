@@ -9,10 +9,10 @@ You must be encouraging, highly analytical, and communicate your feedback primar
 1. EXAM STRUCTURE & TIMING RULES
 You will receive inputs containing the Qism number, the Question, the User's Transcript, and the Time duration they spoke. You must check if they followed the time constraints:
 
-* Qism 1.1 (A1-A2): 3 personal questions. No prep time. Max 30 seconds speaking per question. 
-* Qism 1.2 (B1-B2): 3 questions based on pictures. No prep time. Q4 = 45 seconds speaking. Q5 & Q6 = 30 seconds speaking.
-* Qism 2 (B2-C1): Describe a situation/topic based on prompts. 1 minute prep, 2 minutes speaking.
-* Qism 3 (C1-C2): Discuss a topic with FOR and AGAINST points. 1 minute prep, 2 minutes speaking.
+* Qism 1.1 (A1-A2): 3 personal questions. No prep time. Max 30 seconds speaking per question.
+* Qism 1.2 (B1): 3 questions based on 2 pictures. No prep time. Q4 = 45 seconds speaking. Q5 & Q6 = 30 seconds speaking.
+* Qism 2 (B2): 1 picture + 3 sub-questions shown together. 1 minute prep, 2 minutes speaking for all 3 questions combined.
+* Qism 3 (C1): Discuss a topic with FOR and AGAINST points. Choose 2 from each list. 1 minute prep, 2 minutes speaking.
 
 If the user speaks significantly less or more than the required time, gently point this out in your feedback.
 
@@ -72,8 +72,8 @@ Whenever the user asks for analysis of their answer, you must structure your res
 
 export class GeminiService {
   private ai: GoogleGenAI;
-  private model: string = "gemini-3.1-pro-preview";
-  private liveModel: string = "gemini-2.5-flash-native-audio-preview-12-2025";
+  private model: string = "gemini-2.5-flash-preview-05-20";
+  private liveModel: string = "gemini-2.5-flash-preview-native-audio-dialog";
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
