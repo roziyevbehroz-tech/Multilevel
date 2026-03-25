@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   Clock,
   LogOut,
+  ChevronLeft,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -140,6 +143,130 @@ const MOCK_TEST_1: MockQuestion[] = [
   },
 ];
 
+type PracticeSet = {
+  id: string;
+  title: string;
+  questions: MockQuestion[];
+};
+
+const PRACTICE_BANK: Record<string, { description: string; level: string; sets: PracticeSet[] }> = {
+  "Qism 1.1": {
+    description: "Shaxsiy savollar • 30 soniya • Tayyorgarlik yo'q",
+    level: "A1-A2",
+    sets: [
+      { id: "p1.1.1", title: "Eng yaqin do'st", questions: [{ id: "p1.1.1", part: "Qism 1.1", text: "Please tell me about your best friend.", timeLimit: 30 }] },
+      { id: "p1.1.2", title: "Mamlakat haqida", questions: [{ id: "p1.1.2", part: "Qism 1.1", text: "Tell me about your country.", timeLimit: 30 }] },
+      { id: "p1.1.3", title: "Bo'sh vaqt", questions: [{ id: "p1.1.3", part: "Qism 1.1", text: "What do you like to do in your free time?", timeLimit: 30 }] },
+      { id: "p1.1.4", title: "Musiqa", questions: [{ id: "p1.1.4", part: "Qism 1.1", text: "What kind of music do you enjoy listening to?", timeLimit: 30 }] },
+      { id: "p1.1.5", title: "Shahar yoki qishloq", questions: [{ id: "p1.1.5", part: "Qism 1.1", text: "Do you prefer living in the city or the countryside? Why?", timeLimit: 30 }] },
+      { id: "p1.1.6", title: "Oila", questions: [{ id: "p1.1.6", part: "Qism 1.1", text: "Tell me about your family.", timeLimit: 30 }] },
+      { id: "p1.1.7", title: "Sevimli taom", questions: [{ id: "p1.1.7", part: "Qism 1.1", text: "What is your favourite food and why?", timeLimit: 30 }] },
+      { id: "p1.1.8", title: "Dam olish kunlari", questions: [{ id: "p1.1.8", part: "Qism 1.1", text: "What do you usually do on weekends?", timeLimit: 30 }] },
+      { id: "p1.1.9", title: "Kitob o'qish", questions: [{ id: "p1.1.9", part: "Qism 1.1", text: "Do you like reading books? Why or why not?", timeLimit: 30 }] },
+      { id: "p1.1.10", title: "Sevimli fasl", questions: [{ id: "p1.1.10", part: "Qism 1.1", text: "What is your favourite season and why?", timeLimit: 30 }] },
+    ],
+  },
+  "Qism 1.2": {
+    description: "2 rasm asosida 3 savol • Q1=45s, Q2-3=30s",
+    level: "B1",
+    sets: [
+      {
+        id: "p1.2.set1", title: "Haydash va Yurish",
+        questions: [
+          { id: "p1.2.1a", part: "Qism 1.2", text: "What do you see in these pictures?", timeLimit: 45, imageUrls: ["https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.1b", part: "Qism 1.2", text: "What are some advantages of walking over driving?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.1c", part: "Qism 1.2", text: "Why do some people prefer having a car of their own?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800"] },
+        ],
+      },
+      {
+        id: "p1.2.set2", title: "Kitob va Texnologiya",
+        questions: [
+          { id: "p1.2.2a", part: "Qism 1.2", text: "Compare the two pictures. What can you see?", timeLimit: 45, imageUrls: ["https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.2b", part: "Qism 1.2", text: "What are the benefits of reading books compared to using technology?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.2c", part: "Qism 1.2", text: "Do you think young people read less nowadays? Why?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800"] },
+        ],
+      },
+      {
+        id: "p1.2.set3", title: "Uy ovqati va Restoran",
+        questions: [
+          { id: "p1.2.3a", part: "Qism 1.2", text: "What activities can you see in these pictures?", timeLimit: 45, imageUrls: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.3b", part: "Qism 1.2", text: "Which do you think is healthier — cooking at home or eating at a restaurant?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800"] },
+          { id: "p1.2.3c", part: "Qism 1.2", text: "Why do many people prefer eating out instead of cooking?", timeLimit: 30, imageUrls: ["https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=800", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800"] },
+        ],
+      },
+    ],
+  },
+  "Qism 2": {
+    description: "1 rasm + 3 savol • 1 daqiqa tayyorgarlik • 2 daqiqa javob",
+    level: "B2",
+    sets: [
+      {
+        id: "p2.set1", title: "Muhim qaror",
+        questions: [{
+          id: "p2.1", part: "Qism 2", text: "Look at the photograph and answer the following questions.", timeLimit: 120, prepTime: 60,
+          imageUrls: ["https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800"],
+          subQuestions: ["Tell me about a critical decision you have made.", "How has this decision influenced you and your life?", "What factors have the highest impact on the decisions people make?"],
+        }],
+      },
+      {
+        id: "p2.set2", title: "Unutilmas sayohat",
+        questions: [{
+          id: "p2.2", part: "Qism 2", text: "Look at the photograph and answer the following questions.", timeLimit: 120, prepTime: 60,
+          imageUrls: ["https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=800"],
+          subQuestions: ["Describe a memorable journey or trip you have taken.", "How did this experience change your perspective on life?", "What do people gain from travelling to new places?"],
+        }],
+      },
+      {
+        id: "p2.set3", title: "Qiyin vaziyat",
+        questions: [{
+          id: "p2.3", part: "Qism 2", text: "Look at the photograph and answer the following questions.", timeLimit: 120, prepTime: 60,
+          imageUrls: ["https://images.unsplash.com/photo-1504805572947-34fad45aed93?auto=format&fit=crop&q=80&w=800"],
+          subQuestions: ["Tell me about a time you faced a difficult challenge.", "How did you overcome this challenge?", "What skills are most important when dealing with problems?"],
+        }],
+      },
+    ],
+  },
+  "Qism 3": {
+    description: "FOR/AGAINST munozara • 1 daqiqa tayyorgarlik • 2 daqiqa javob",
+    level: "C1",
+    sets: [
+      {
+        id: "p3.set1", title: "Qurol ko'tarish huquqi",
+        questions: [{
+          id: "p3.1", part: "Qism 3", text: "Citizens should be allowed to carry personal guns.", timeLimit: 120, prepTime: 60,
+          part3Data: {
+            topic: "Citizens should be allowed to carry personal guns.",
+            for: ["Guns can help people protect themselves", "They prevent people from becoming victims of crimes like burglary", "Necessary for hunting or target sports"],
+            against: ["Guns are weapons that are used to commit a crime", "Fewer guns will reduce the murder rate", "Small or military guns are not useful for activities like hunting"],
+          },
+        }],
+      },
+      {
+        id: "p3.set2", title: "Ijtimoiy tarmoqlar",
+        questions: [{
+          id: "p3.2", part: "Qism 3", text: "Social media does more harm than good to young people.", timeLimit: 120, prepTime: 60,
+          part3Data: {
+            topic: "Social media does more harm than good to young people.",
+            for: ["Social media can lead to cyberbullying and mental health issues", "It is highly addictive and wastes valuable study time", "Privacy concerns — young people share too much personal information"],
+            against: ["It helps young people connect with friends and family globally", "It provides access to educational content and current events", "It allows young entrepreneurs to promote their ideas and businesses"],
+          },
+        }],
+      },
+      {
+        id: "p3.set3", title: "Maktab formasi",
+        questions: [{
+          id: "p3.3", part: "Qism 3", text: "All students should be required to wear school uniforms.", timeLimit: 120, prepTime: 60,
+          part3Data: {
+            topic: "All students should be required to wear school uniforms.",
+            for: ["Uniforms promote equality and reduce bullying based on clothing", "They create a sense of belonging and school identity", "Students spend less time choosing what to wear each morning"],
+            against: ["Uniforms limit students' freedom of self-expression", "They can be expensive for low-income families", "There is no evidence that uniforms improve academic performance"],
+          },
+        }],
+      },
+    ],
+  },
+};
+
 const LessonLabAssistant: React.FC = () => {
   const [isAITeacherOpen, setIsAITeacherOpen] = useState(false);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
@@ -178,7 +305,13 @@ const LessonLabAssistant: React.FC = () => {
   });
   const [showProfile, setShowProfile] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [practiceQuestionIndex, setPracticeQuestionIndex] = useState(0);
+
+  // Practice mode states
+  const [practiceTab, setPracticeTab] = useState<string>("Qism 1.1");
+  const [practiceSelectedSet, setPracticeSelectedSet] = useState<PracticeSet | null>(null);
+  const [practiceQIndex, setPracticeQIndex] = useState(0);
+  const [isGeneratingQ, setIsGeneratingQ] = useState(false);
+  const [lastSavedPracticeAnswer, setLastSavedPracticeAnswer] = useState<SavedAnswer | null>(null);
 
   // Load saved profile from localforage
   useEffect(() => {
@@ -186,16 +319,6 @@ const LessonLabAssistant: React.FC = () => {
       if (saved) setUserProfile(saved);
     });
   }, []);
-
-  useEffect(() => {
-    const partPrefix = selectedPart.split(" ").slice(0, 2).join(" ");
-    const questions = MOCK_TEST_1.filter((q) => q.part === partPrefix);
-    if (questions.length > 0) {
-      const randomIndex = Math.floor(Math.random() * questions.length);
-      const globalIndex = MOCK_TEST_1.findIndex((q) => q.id === questions[randomIndex].id);
-      setPracticeQuestionIndex(globalIndex !== -1 ? globalIndex : 0);
-    }
-  }, [selectedPart]);
 
   const [mockAnswers, setMockAnswers] = useState<
     {
@@ -237,33 +360,30 @@ const LessonLabAssistant: React.FC = () => {
   }, [messages]);
 
   const handlePracticeRecordingStop = async (blob: Blob) => {
-    setIsTyping(true);
-    setAnalysisResult(null);
-    
+    if (!practiceSelectedSet) return;
+
     try {
       const audioUrl = URL.createObjectURL(blob);
-      const currentPracticeQ = MOCK_TEST_1[practiceQuestionIndex];
-      const answerId = `answer_${Date.now()}_${currentPracticeQ.id}`;
+      const currentQ = practiceSelectedSet.questions[practiceQIndex];
+      const answerId = `answer_${Date.now()}_${currentQ.id}`;
 
-      await localforage.setItem(answerId, {
+      const savedAnswer: SavedAnswer = {
         id: answerId,
-        questionId: currentPracticeQ.id,
-        part: currentPracticeQ.part,
-        questionText: currentPracticeQ.text,
+        questionId: currentQ.id,
+        part: currentQ.part,
+        questionText: currentQ.text,
         audioUrl,
         audioBlob: blob,
         transcript: null,
         analysis: null,
         timestamp: Date.now(),
-      });
-      
+      };
+
+      await localforage.setItem(answerId, savedAnswer);
+      setLastSavedPracticeAnswer(savedAnswer);
       setHistoryRefreshTrigger(prev => prev + 1);
-      setAnalysisResult("Javobingiz saqlandi. Tahlil qilish uchun o'ng tomondagi 'AI Teacher' tugmasini bosing yoki chapdagi 'Javoblar Tarixi' panelidan foydalaning.");
     } catch (err) {
       console.error("Error saving practice answer:", err);
-      setAnalysisResult("Kechirasiz, javobni saqlashda xatolik yuz berdi.");
-    } finally {
-      setIsTyping(false);
     }
   };
 
@@ -411,13 +531,12 @@ const LessonLabAssistant: React.FC = () => {
     if (isStartingLive) return;
     setIsStartingLive(true);
     try {
-      // Set initial time based on selected part or mock question
+      // Set initial time based on current question
       let initialTime = 30; // default Qism 1.1
       if (examMode === "mock_running") {
         initialTime = MOCK_TEST_1[currentQuestionIndex].timeLimit;
-      } else {
-        if (selectedPart === "Qism 1.2 (Picture)") initialTime = 45;
-        else if (selectedPart === "Qism 2 (Cue Card)" || selectedPart === "Qism 3 (Discussion)") initialTime = 120;
+      } else if (practiceSelectedSet) {
+        initialTime = practiceSelectedSet.questions[practiceQIndex].timeLimit;
       }
       setTimeLeft(initialTime);
 
@@ -456,9 +575,8 @@ const LessonLabAssistant: React.FC = () => {
 
         if (examMode === "mock_running") {
           handleMockRecordingStop(blob);
-        } else if (pendingAnalysisRef.current) {
+        } else if (examMode === "practice") {
           handlePracticeRecordingStop(blob);
-          pendingAnalysisRef.current = false;
         }
       };
       recorder.start();
@@ -616,10 +734,102 @@ const LessonLabAssistant: React.FC = () => {
     setVisualizerData(new Uint8Array(0));
   };
 
-  const handleAnalyze = () => {
-    if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: "audio/webm" });
-    handlePracticeRecordingStop(blob);
+  const generateRandomQuestion = async () => {
+    setIsGeneratingQ(true);
+    try {
+      const partPrompts: Record<string, string> = {
+        "Qism 1.1": "Generate a single personal question for Multi-level Speaking Exam Qism 1.1 (A1-A2 level). It should be a simple question about the student's life, interests, or opinions. Reply with ONLY the question text in English, nothing else. Do not add quotation marks.",
+        "Qism 1.2": `Generate a set of 3 questions for Multi-level Speaking Exam Qism 1.2 (B1 level) based on comparing two pictures. Format your response exactly like this (no extra text):
+TOPIC: [short topic title in Uzbek, 2-3 words]
+Q1: [45-second question asking what you see or to compare the pictures]
+Q2: [30-second question about advantages or benefits]
+Q3: [30-second question asking for opinion or preference]`,
+        "Qism 2": `Generate a set of 3 sub-questions for Multi-level Speaking Exam Qism 2 (B2 level). The questions should relate to a single life experience topic. Format your response exactly like this (no extra text):
+TOPIC: [short topic title in Uzbek, 2-3 words]
+Q1: [personal experience question]
+Q2: [impact or consequence question]
+Q3: [general opinion question]`,
+        "Qism 3": `Generate a debate topic with FOR and AGAINST points for Multi-level Speaking Exam Qism 3 (C1 level). Format your response exactly like this (no extra text):
+TOPIC: [debatable statement in English]
+TITLE: [short title in Uzbek, 2-3 words]
+FOR1: [argument for]
+FOR2: [argument for]
+FOR3: [argument for]
+AGAINST1: [argument against]
+AGAINST2: [argument against]
+AGAINST3: [argument against]`,
+      };
+
+      const response = await gemini.generateText(partPrompts[practiceTab]);
+      const text = response.text || "";
+      const aiSetId = `ai_${Date.now()}`;
+      let newSet: PracticeSet;
+
+      if (practiceTab === "Qism 1.1") {
+        newSet = {
+          id: aiSetId, title: "AI Savol",
+          questions: [{ id: aiSetId, part: "Qism 1.1", text: text.trim(), timeLimit: 30 }],
+        };
+      } else if (practiceTab === "Qism 1.2") {
+        const lines = text.split("\n").filter((l: string) => l.trim());
+        const topic = lines.find((l: string) => l.startsWith("TOPIC:"))?.replace("TOPIC:", "").trim() || "AI Savol";
+        const q1 = lines.find((l: string) => l.startsWith("Q1:"))?.replace("Q1:", "").trim() || "What do you see in these pictures?";
+        const q2 = lines.find((l: string) => l.startsWith("Q2:"))?.replace("Q2:", "").trim() || "Compare the two pictures.";
+        const q3 = lines.find((l: string) => l.startsWith("Q3:"))?.replace("Q3:", "").trim() || "Which do you prefer and why?";
+        const bankSets = PRACTICE_BANK["Qism 1.2"].sets;
+        const randomImages = bankSets[Math.floor(Math.random() * bankSets.length)].questions[0].imageUrls;
+
+        newSet = {
+          id: aiSetId, title: `AI: ${topic}`,
+          questions: [
+            { id: `${aiSetId}_a`, part: "Qism 1.2", text: q1, timeLimit: 45, imageUrls: randomImages },
+            { id: `${aiSetId}_b`, part: "Qism 1.2", text: q2, timeLimit: 30, imageUrls: randomImages },
+            { id: `${aiSetId}_c`, part: "Qism 1.2", text: q3, timeLimit: 30, imageUrls: randomImages },
+          ],
+        };
+      } else if (practiceTab === "Qism 2") {
+        const lines = text.split("\n").filter((l: string) => l.trim());
+        const topic = lines.find((l: string) => l.startsWith("TOPIC:"))?.replace("TOPIC:", "").trim() || "AI Savol";
+        const q1 = lines.find((l: string) => l.startsWith("Q1:"))?.replace("Q1:", "").trim() || "";
+        const q2 = lines.find((l: string) => l.startsWith("Q2:"))?.replace("Q2:", "").trim() || "";
+        const q3 = lines.find((l: string) => l.startsWith("Q3:"))?.replace("Q3:", "").trim() || "";
+        const bankSets = PRACTICE_BANK["Qism 2"].sets;
+        const randomImages = bankSets[Math.floor(Math.random() * bankSets.length)].questions[0].imageUrls;
+
+        newSet = {
+          id: aiSetId, title: `AI: ${topic}`,
+          questions: [{
+            id: aiSetId, part: "Qism 2", text: "Look at the photograph and answer the following questions.",
+            timeLimit: 120, prepTime: 60, imageUrls: randomImages,
+            subQuestions: [q1, q2, q3].filter(Boolean),
+          }],
+        };
+      } else {
+        const lines = text.split("\n").filter((l: string) => l.trim());
+        const topicText = lines.find((l: string) => l.startsWith("TOPIC:"))?.replace("TOPIC:", "").trim() || "";
+        const title = lines.find((l: string) => l.startsWith("TITLE:"))?.replace("TITLE:", "").trim() || "AI Mavzu";
+        const forPoints = [1, 2, 3].map(i => lines.find((l: string) => l.startsWith(`FOR${i}:`))?.replace(`FOR${i}:`, "").trim() || "").filter(Boolean);
+        const againstPoints = [1, 2, 3].map(i => lines.find((l: string) => l.startsWith(`AGAINST${i}:`))?.replace(`AGAINST${i}:`, "").trim() || "").filter(Boolean);
+
+        newSet = {
+          id: aiSetId, title: `AI: ${title}`,
+          questions: [{
+            id: aiSetId, part: "Qism 3", text: topicText, timeLimit: 120, prepTime: 60,
+            part3Data: { topic: topicText, for: forPoints, against: againstPoints },
+          }],
+        };
+      }
+
+      setPracticeSelectedSet(newSet);
+      setPracticeQIndex(0);
+      setUserAudioUrl(null);
+      setRecordedChunks([]);
+      setLastSavedPracticeAnswer(null);
+    } catch (err) {
+      console.error("Error generating question:", err);
+    } finally {
+      setIsGeneratingQ(false);
+    }
   };
 
   const startPrepOrLive = () => {
@@ -703,6 +913,11 @@ const LessonLabAssistant: React.FC = () => {
               setIsPrepTime(false);
               setPrepTimeLeft(null);
               setExamMode("practice");
+              setPracticeSelectedSet(null);
+              setPracticeQIndex(0);
+              setUserAudioUrl(null);
+              setRecordedChunks([]);
+              setLastSavedPracticeAnswer(null);
             }}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode === "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
           >
@@ -742,264 +957,361 @@ const LessonLabAssistant: React.FC = () => {
       </header>
 
       {examMode === "practice" && (
-        <>
-          {/* Progress Steps */}
-          <div className="max-w-4xl mx-auto px-6 my-8">
-            <div className="flex items-center justify-between relative">
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 z-0"></div>
-              <motion.div 
-                className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-indigo-600 z-0"
-                initial={{ width: "0%" }}
-                animate={{ width: selectedPart.includes("Qism 1") ? "33%" : selectedPart.includes("Qism 2") ? "66%" : "100%" }}
-                transition={{ duration: 0.5 }}
-              ></motion.div>
-
-              {[1, 2, 3].map((part) => (
-                <div key={part} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold z-10 relative transition-colors ${
-                  (part === 1 && selectedPart.includes("Qism 1")) || 
-                  (part === 2 && selectedPart.includes("Qism 2")) || 
-                  (part === 3 && selectedPart.includes("Qism 3")) 
-                  ? "bg-indigo-600 text-white" : "bg-white border-2 border-indigo-600 text-indigo-600"
-                }`}>
-                  {part}
-                </div>
-              ))}
-            </div>
+        <main className="max-w-5xl mx-auto px-6 mt-8">
+          {/* Part Selector Tabs */}
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            {Object.entries(PRACTICE_BANK).map(([part, data]) => (
+              <button
+                key={part}
+                onClick={() => {
+                  if (isLive || isStartingLive) return;
+                  setPracticeTab(part);
+                  setPracticeSelectedSet(null);
+                  setPracticeQIndex(0);
+                  setUserAudioUrl(null);
+                  setRecordedChunks([]);
+                  setLastSavedPracticeAnswer(null);
+                }}
+                className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
+                  practiceTab === part
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-indigo-300"
+                }`}
+              >
+                {part} <span className="text-xs opacity-75">({data.level})</span>
+              </button>
+            ))}
           </div>
 
-          {/* Main Exam Card */}
-          <main className="max-w-5xl mx-auto px-6">
+          {!practiceSelectedSet ? (
+            /* ═══ QUESTION SELECTION MODE ═══ */
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              {/* Card Header */}
-              <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-b border-gray-200 bg-white gap-4">
-                <div className="font-bold text-[#1E293B]">
-                  <select
-                    value={selectedPart}
-                    onChange={(e) => setSelectedPart(e.target.value)}
-                    className="bg-transparent outline-none cursor-pointer uppercase text-indigo-700 font-bold"
-                  >
-                    <option value="Qism 1.1 (Personal)">QISM 1.1</option>
-                    <option value="Qism 1.2 (Picture)">QISM 1.2</option>
-                    <option value="Qism 2 (Cue Card)">QISM 2</option>
-                    <option value="Qism 3 (Discussion)">QISM 3</option>
-                  </select>
+              {/* Header */}
+              <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div>
+                  <h2 className="font-bold text-lg text-[#1E293B]">{practiceTab}</h2>
+                  <p className="text-sm text-gray-500">{PRACTICE_BANK[practiceTab].description}</p>
                 </div>
-                <div className="text-sm text-gray-500 border border-gray-200 px-4 py-1.5 rounded bg-gray-50">
-                  Standart mikrofon
-                </div>
+                <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold">
+                  {PRACTICE_BANK[practiceTab].level}
+                </span>
               </div>
               <div className="h-1 w-full bg-[#E87722]"></div>
 
-              {/* Card Body */}
-              <div className="p-8 md:p-12 flex flex-col items-center">
+              {/* AI Random Question Button */}
+              <div className="p-4 border-b border-gray-100">
                 <button
-                  onClick={() => startLiveSession(true)}
-                  className="flex items-center gap-3 mb-6 bg-emerald-50 px-6 py-3 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                  onClick={generateRandomQuestion}
+                  disabled={isGeneratingQ}
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3.5 rounded-xl font-bold flex items-center justify-center gap-3 hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50"
                 >
-                  <Bot size={24} className="text-emerald-600" />
-                  <span className="text-emerald-900 font-bold text-sm tracking-wide uppercase">
-                    AI TUTOR bilan suhbat
-                  </span>
+                  {isGeneratingQ ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={20} />
+                  )}
+                  {isGeneratingQ ? "AI savol yaratmoqda..." : "AI Tasodifiy Savol"}
                 </button>
-                <h2 className="text-[#E87722] font-bold text-xl mb-4 tracking-wide uppercase">
-                  Mashq rejimi
-                </h2>
+              </div>
 
-                {/* Display Practice Question */}
-                <div className="w-full max-w-3xl mb-8 flex flex-col items-center">
-                  {MOCK_TEST_1[practiceQuestionIndex].imageUrls && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 w-full max-w-2xl">
-                      {MOCK_TEST_1[practiceQuestionIndex].imageUrls?.map((url, index) => (
-                        <img
-                          key={index}
-                          src={url}
-                          alt={`Practice prompt ${index + 1}`}
-                          className="w-full rounded-lg shadow-md object-cover h-64"
-                          referrerPolicy="no-referrer"
-                        />
-                      ))}
+              {/* Question Sets List */}
+              <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
+                {PRACTICE_BANK[practiceTab].sets.map((set) => (
+                  <button
+                    key={set.id}
+                    onClick={() => {
+                      setPracticeSelectedSet(set);
+                      setPracticeQIndex(0);
+                      setUserAudioUrl(null);
+                      setRecordedChunks([]);
+                      setLastSavedPracticeAnswer(null);
+                      setAnalysisResult(null);
+                    }}
+                    className="w-full p-4 hover:bg-indigo-50 transition-colors flex items-center gap-4 text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
+                      {set.questions.length > 1 ? set.questions.length : "1"}
                     </div>
-                  )}
-                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl text-center whitespace-pre-line">
-                    {MOCK_TEST_1[practiceQuestionIndex].text}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-[#1E293B] text-sm mb-0.5">{set.title}</div>
+                      <div className="text-gray-500 text-sm truncate">{set.questions[0].text}</div>
+                    </div>
+                    <ArrowRight size={18} className="text-gray-400 group-hover:text-indigo-600 transition-colors shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* ═══ PRACTICE MODE — Question Selected ═══ */
+            (() => {
+              const currentQ = practiceSelectedSet.questions[practiceQIndex];
+              const hasDoneRecording = !isLive && !isStartingLive && !isPrepTime && !!userAudioUrl;
+              const isReady = !isLive && !isStartingLive && !isPrepTime && !userAudioUrl;
+
+              return (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Header with Back Button */}
+                  <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => {
+                        isSwitchingModeRef.current = true;
+                        stopLiveSession();
+                        setPracticeSelectedSet(null);
+                        setPracticeQIndex(0);
+                        setUserAudioUrl(null);
+                        setRecordedChunks([]);
+                        setIsPrepTime(false);
+                        setPrepTimeLeft(null);
+                        setLastSavedPracticeAnswer(null);
+                      }}
+                      className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 font-bold text-sm transition-colors"
+                    >
+                      <ChevronLeft size={18} /> Ortga
+                    </button>
+                    <div className="font-bold text-[#1E293B] uppercase">
+                      {practiceTab}{" "}
+                      <span className="text-xs text-gray-400 normal-case">
+                        ({PRACTICE_BANK[practiceTab].level})
+                      </span>
+                    </div>
+                    {practiceSelectedSet.questions.length > 1 ? (
+                      <div className="text-sm font-bold text-indigo-600">
+                        Savol {practiceQIndex + 1} / {practiceSelectedSet.questions.length}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Practice</div>
+                    )}
                   </div>
+                  <div className="h-1 w-full bg-[#E87722]"></div>
 
-                  {/* Sub-questions for Qism 2 */}
-                  {MOCK_TEST_1[practiceQuestionIndex].subQuestions && (
-                    <div className="w-full max-w-3xl mt-6">
-                      <ul className="space-y-3 text-left">
-                        {MOCK_TEST_1[practiceQuestionIndex].subQuestions?.map((q, i) => (
-                          <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                            <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
-                            <span>{q}</span>
-                          </li>
+                  {/* Question Content */}
+                  <div className="p-8 md:p-12 flex flex-col items-center">
+                    {/* AI Tutor Discussion Button */}
+                    {isReady && !hasDoneRecording && (
+                      <button
+                        onClick={() => startLiveSession(true)}
+                        className="flex items-center gap-3 mb-6 bg-emerald-50 px-6 py-3 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                      >
+                        <Bot size={24} className="text-emerald-600" />
+                        <span className="text-emerald-900 font-bold text-sm tracking-wide uppercase">
+                          AI TUTOR bilan muhokama
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Images */}
+                    {currentQ.imageUrls && (
+                      <div className={`grid gap-4 mb-6 w-full max-w-2xl ${currentQ.imageUrls.length === 1 ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
+                        {currentQ.imageUrls.map((url, index) => (
+                          <img
+                            key={index}
+                            src={url}
+                            alt={`Practice ${index + 1}`}
+                            className="w-full rounded-lg shadow-md object-cover h-64"
+                            referrerPolicy="no-referrer"
+                          />
                         ))}
-                      </ul>
-                    </div>
-                  )}
+                      </div>
+                    )}
 
-                  {MOCK_TEST_1[practiceQuestionIndex].part3Data && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-6 text-left">
-                      <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                        <h4 className="font-bold text-green-800 mb-3">FOR</h4>
-                        <ul className="list-disc pl-5 space-y-2 text-green-900">
-                          {MOCK_TEST_1[practiceQuestionIndex].part3Data?.for.map(
-                            (point, i) => (
-                              <li key={i}>{point}</li>
-                            ),
-                          )}
+                    {/* Question Text */}
+                    <div className="text-[#1E293B] font-bold text-xl md:text-2xl text-center whitespace-pre-line mb-6">
+                      {currentQ.text}
+                    </div>
+
+                    {/* Sub-questions for Qism 2 */}
+                    {currentQ.subQuestions && (
+                      <div className="w-full max-w-3xl mb-6">
+                        <ul className="space-y-3 text-left">
+                          {currentQ.subQuestions.map((q, i) => (
+                            <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                              <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
+                              <span>{q}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
-                      <div className="bg-red-50 p-6 rounded-xl border border-red-200">
-                        <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
-                        <ul className="list-disc pl-5 space-y-2 text-red-900">
-                          {MOCK_TEST_1[practiceQuestionIndex].part3Data?.against.map(
-                            (point, i) => (
+                    )}
+
+                    {/* FOR/AGAINST for Qism 3 */}
+                    {currentQ.part3Data && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-6 text-left">
+                        <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+                          <h4 className="font-bold text-green-800 mb-3">FOR</h4>
+                          <ul className="list-disc pl-5 space-y-2 text-green-900">
+                            {currentQ.part3Data.for.map((point, i) => (
                               <li key={i}>{point}</li>
-                            ),
-                          )}
-                        </ul>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+                          <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
+                          <ul className="list-disc pl-5 space-y-2 text-red-900">
+                            {currentQ.part3Data.against.map((point, i) => (
+                              <li key={i}>{point}</li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                <p className="text-gray-500 font-medium text-sm md:text-base mb-8 text-center max-w-xl leading-snug italic">
-                  {messages
-                    .filter((m) => m.role === "model")
-                    .pop()
-                    ?.text || "Tayyormisiz? Speaking mashqini boshlaymiz!"}
-                </p>
+                    {/* Prep Time Countdown */}
+                    {isPrepTime && (
+                      <div className="flex flex-col items-center gap-3 mb-8">
+                        <AlertTriangle size={32} className="text-amber-500" />
+                        <div className="text-[#1E293B] font-bold">Tayyorlanish vaqti</div>
+                        <div className="font-bold text-4xl text-amber-600 animate-pulse">
+                          {prepTimeLeft} soniya
+                        </div>
+                        <p className="text-sm text-gray-500">Fikrlaringizni jamlang...</p>
+                        <button
+                          onClick={() => setPrepTimeLeft(0)}
+                          className="text-sm text-indigo-600 hover:text-indigo-800 underline font-medium"
+                        >
+                          O'tkazib yuborish
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Visualizer & Record Button */}
-                  <div className="flex flex-col items-center gap-4 w-full">
-                    <div className="flex items-end gap-1 h-16 justify-center w-full">
-                      {isLive
-                        ? Array.from(visualizerData)
-                            .slice(0, 24)
-                            .map((value, i) => (
+                    {/* Audio Visualizer */}
+                    {!hasDoneRecording && (
+                      <div className="flex items-end gap-1 h-16 justify-center w-full mb-6">
+                        {isLive
+                          ? Array.from(visualizerData).slice(0, 24).map((value, i) => (
                               <div
                                 key={i}
-                                style={{
-                                  height: `${Math.max(10, (value / 255) * 100)}%`,
-                                }}
+                                style={{ height: `${Math.max(10, (value / 255) * 100)}%` }}
                                 className="w-2 md:w-3 bg-indigo-500 rounded-t-sm transition-all duration-75"
                               />
                             ))
-                        : Array.from({ length: 24 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
-                            />
-                          ))}
-                    </div>
+                          : Array.from({ length: 24 }).map((_, i) => (
+                              <div key={i} className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4" />
+                            ))}
+                      </div>
+                    )}
 
-                    {!isLive && !isStartingLive && !isPrepTime ? (
-                      <div className="flex flex-col md:flex-row gap-4">
-                        <button
-                          onClick={() => {
-                            const currentQ = MOCK_TEST_1[practiceQuestionIndex];
-                            if (currentQ.prepTime && !isPrepTime) {
-                              setIsPrepTime(true);
-                              setPrepTimeLeft(currentQ.prepTime);
-                            } else {
-                              startLiveSession(false);
-                            }
-                          }}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5"
-                        >
-                          <Mic size={20} />
-                          JAVOB BERISH
-                        </button>
-                      </div>
-                    ) : isStartingLive ? (
+                    {/* Recording Controls */}
+                    {isReady && !hasDoneRecording && (
+                      <button
+                        onClick={() => {
+                          if (currentQ.prepTime && !isPrepTime) {
+                            setIsPrepTime(true);
+                            setPrepTimeLeft(currentQ.prepTime);
+                          } else {
+                            startLiveSession(false);
+                          }
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5"
+                      >
+                        <Mic size={20} /> JAVOB BERISH
+                      </button>
+                    )}
+
+                    {isStartingLive && (
                       <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
-                        <Loader2 size={20} className="animate-spin" />
-                        ULANMOQDA...
+                        <Loader2 size={20} className="animate-spin" /> ULANMOQDA...
                       </div>
-                    ) : (
+                    )}
+
+                    {isLive && !isPrepTime && (
                       <button
                         onClick={() => stopLiveSession(true)}
                         className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 animate-pulse"
                       >
-                        <Square size={20} fill="currentColor" />
-                        YAKUNLASH
+                        <Square size={20} fill="currentColor" /> YAKUNLASH
                       </button>
                     )}
-                  </div>
 
-                  {/* Prep Time (for Qism 2 & 3) */}
-                  {isPrepTime && (
-                    <div className="flex flex-col items-center justify-center gap-3 mt-8">
-                      <AlertTriangle size={32} className="text-amber-500" />
-                      <div className="text-[#1E293B] font-bold">Tayyorlanish vaqti</div>
-                      <div className="font-bold text-3xl text-amber-600 animate-pulse">
-                        {prepTimeLeft} soniya
+                    {/* Timer */}
+                    {!hasDoneRecording && !isPrepTime && (
+                      <div className="flex items-center gap-2 mt-6">
+                        <Clock size={18} className="text-gray-500" />
+                        <span className={`font-bold ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}>
+                          {isLive && timeLeft !== null ? `${timeLeft} soniya` : `${currentQ.timeLimit} soniya`}
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-500">Fikrlaringizni jamlang...</p>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Speak Time */}
-                  <div className="flex flex-col items-center justify-center gap-3 mt-8">
-                    <Clock size={32} className="text-[#1E293B]" />
-                    <div className="text-[#1E293B] font-bold">
-                      Javob berish vaqti
-                    </div>
-                    <div
-                      className={`font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
-                    >
-                      {timeLeft !== null ? `${timeLeft} soniya` : `${selectedPart === "Qism 1.2 (Picture)" ? 45 : selectedPart.includes("Qism 2") || selectedPart.includes("Qism 3") ? 120 : 30} soniya`}
-                    </div>
+                    {/* ═══ DONE STATE — After Recording ═══ */}
+                    {hasDoneRecording && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="w-full max-w-2xl flex flex-col items-center gap-6"
+                      >
+                        {/* Audio Player */}
+                        <div className="w-full bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm mb-3">
+                            <Play size={16} /> Sizning javobingiz:
+                          </div>
+                          <audio src={userAudioUrl!} controls className="w-full" />
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {/* Re-record */}
+                          <button
+                            onClick={() => {
+                              setUserAudioUrl(null);
+                              setRecordedChunks([]);
+                              setLastSavedPracticeAnswer(null);
+                            }}
+                            className="flex items-center gap-2 border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
+                          >
+                            <RotateCcw size={18} /> Qayta yozish
+                          </button>
+
+                          {/* AI Analysis — opens AI Teacher */}
+                          <button
+                            onClick={() => {
+                              if (lastSavedPracticeAnswer) {
+                                setInitialSelectedAnswer(lastSavedPracticeAnswer);
+                                setIsAITeacherOpen(true);
+                              }
+                            }}
+                            disabled={!lastSavedPracticeAnswer}
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md disabled:opacity-50"
+                          >
+                            <Bot size={18} /> AI Tahlil
+                          </button>
+
+                          {/* Next Question in Set (for multi-question sets like Qism 1.2) */}
+                          {practiceSelectedSet.questions.length > 1 && practiceQIndex < practiceSelectedSet.questions.length - 1 && (
+                            <button
+                              onClick={() => {
+                                setPracticeQIndex((prev) => prev + 1);
+                                setUserAudioUrl(null);
+                                setRecordedChunks([]);
+                                setLastSavedPracticeAnswer(null);
+                              }}
+                              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors shadow-md"
+                            >
+                              <ArrowRight size={18} /> Keyingi savol
+                            </button>
+                          )}
+
+                          {/* Back to question list */}
+                          <button
+                            onClick={() => {
+                              setPracticeSelectedSet(null);
+                              setPracticeQIndex(0);
+                              setUserAudioUrl(null);
+                              setRecordedChunks([]);
+                              setLastSavedPracticeAnswer(null);
+                            }}
+                            className="flex items-center gap-2 border-2 border-gray-300 text-gray-600 hover:bg-gray-100 px-5 py-2.5 rounded-xl font-bold transition-colors"
+                          >
+                            Boshqa savol
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
-              </div>
-
-            {/* Footer Actions */}
-            <div className="flex flex-wrap justify-center gap-4 mt-8">
-              <button className="flex items-center gap-2 border-2 border-[#E87722] text-[#E87722] hover:bg-[#E87722] hover:text-white px-8 py-2.5 rounded font-bold transition-colors">
-                <LogOut size={18} />
-                Chiqish
-              </button>
-              {(recordedChunks.length > 0) && (
-                <button
-                  onClick={() => {
-                    stopLiveSession();
-                    setUserAudioUrl(null);
-                    setRecordedChunks([]);
-                  }}
-                  className="flex items-center gap-2 border-2 border-[#1E73BE] text-[#1E73BE] hover:bg-[#1E73BE] hover:text-white px-8 py-2.5 rounded font-bold transition-colors"
-                >
-                  <RotateCcw size={18} />
-                  Qayta topshirish
-                </button>
-              )}
-            </div>
-
-                   {isTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-12 bg-white rounded-xl shadow-lg border border-indigo-100 p-8 flex flex-col items-center justify-center gap-4"
-              >
-                <div className="relative">
-                  <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-                  <Bot
-                    size={48}
-                    className="text-indigo-600 relative z-10 animate-bounce"
-                  />
-                </div>
-                <h3 className="text-xl font-bold text-indigo-900">
-                  Super AI Agent tahlil qilmoqda...
-                </h3>
-                <p className="text-gray-500 text-center max-w-md">
-                  Iltimos kuting, sizning javobingiz Multi-level mezonlari
-                  asosida tekshirilmoqda.
-                </p>
-              </motion.div>
-            )}
-          </main>
-        </>
+              );
+            })()
+          )}
+        </main>
       )}
 
       {examMode === "mock_running" && (
