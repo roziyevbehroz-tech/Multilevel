@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Mic, Send, Loader2, Bot, User, Trash2, Play, Square, MessageSquare, BookOpen, BarChart } from "lucide-react";
+import { X, Send, Loader2, Bot, User, Trash2, MessageSquare, BookOpen, BarChart } from "lucide-react";
 import localforage from "localforage";
 import ReactMarkdown from "react-markdown";
 import { gemini } from "../services/gemini";
@@ -17,7 +17,7 @@ interface AITeacherPanelProps {
 export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose, initialSelectedAnswer }) => {
   const [savedAnswers, setSavedAnswers] = useState<SavedAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<SavedAnswer | null>(null);
-  const [activeTab, setActiveTab] = useState<"chat" | "vocab">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "vocab" | "progress">("chat");
   const [messages, setMessages] = useState<{ role: "user" | "model"; text: string }[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -38,10 +38,14 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
 
   const loadSavedAnswers = async () => {
     try {
+      // Revoke old object URLs to prevent memory leaks
+      savedAnswers.forEach(a => {
+        if (a.audioUrl) URL.revokeObjectURL(a.audioUrl);
+      });
+
       const answers: SavedAnswer[] = [];
       await localforage.iterate((value: SavedAnswer, key: string) => {
         if (key.startsWith("answer_")) {
-          // Recreate audio URL from blob since object URLs are session-specific
           if (value.audioBlob) {
             value.audioUrl = URL.createObjectURL(value.audioBlob);
           }
@@ -197,8 +201,16 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                 <button
                   onClick={() => setActiveTab("vocab")}
                   className={`p-2 rounded-lg transition-colors ${activeTab === "vocab" ? "bg-indigo-700" : "hover:bg-indigo-700"}`}
+                  title="Lug'at"
                 >
                   <BookOpen size={20} />
+                </button>
+                <button
+                  onClick={() => setActiveTab("progress")}
+                  className={`p-2 rounded-lg transition-colors ${activeTab === "progress" ? "bg-indigo-700" : "hover:bg-indigo-700"}`}
+                  title="Progress"
+                >
+                  <BarChart size={20} />
                 </button>
                 <button onClick={onClose} className="p-2 hover:bg-indigo-700 rounded-full transition-colors">
                   <X size={20} />
@@ -309,9 +321,13 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                     </div>
                   </div>
                 )
-              ) : (
+              ) : activeTab === "vocab" ? (
                 <div className="flex-1 overflow-y-auto p-4">
                   <VocabularyBuilder />
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto p-4">
+                  <ProgressDashboard />
                 </div>
               )}
             </div>

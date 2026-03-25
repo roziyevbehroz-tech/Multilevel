@@ -23,6 +23,11 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
 
   const loadSavedAnswers = async () => {
     try {
+      // Revoke old object URLs to prevent memory leaks
+      savedAnswers.forEach(a => {
+        if (a.audioUrl) URL.revokeObjectURL(a.audioUrl);
+      });
+
       const answers: SavedAnswer[] = [];
       await localforage.iterate((value: SavedAnswer, key: string) => {
         if (key.startsWith("answer_")) {

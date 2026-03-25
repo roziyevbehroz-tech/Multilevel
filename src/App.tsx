@@ -5,24 +5,16 @@ import {
   Square,
   Play,
   RotateCcw,
-  Send,
-  MessageSquare,
-  Award,
-  BookOpen,
-  ChevronRight,
   User,
   Bot,
   Loader2,
-  Globe,
-  Zap,
-  Timer,
   AlertTriangle,
   Clock,
   LogOut,
-  CheckCircle2,
-  Settings,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+
+
 import localforage from "localforage";
 import { gemini } from "./services/gemini";
 import { ExamStage, CEFRLevel, Message, ExamState, SavedAnswer, AnalysisPreferences } from "./types";
@@ -151,9 +143,15 @@ const LessonLabAssistant: React.FC = () => {
     preferredLanguage: 'Uzbek',
   });
   const [showProfile, setShowProfile] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [practiceQuestionIndex, setPracticeQuestionIndex] = useState(0);
+
+  // Load saved profile from localforage
+  useEffect(() => {
+    localforage.getItem<UserProfile>('user_profile').then(saved => {
+      if (saved) setUserProfile(saved);
+    });
+  }, []);
 
   useEffect(() => {
     const partPrefix = selectedPart.split(" ").slice(0, 2).join(" ");
@@ -210,13 +208,14 @@ const LessonLabAssistant: React.FC = () => {
     
     try {
       const audioUrl = URL.createObjectURL(blob);
-      const answerId = `answer_${Date.now()}_practice`;
-      
+      const currentPracticeQ = MOCK_TEST_1[practiceQuestionIndex];
+      const answerId = `answer_${Date.now()}_${currentPracticeQ.id}`;
+
       await localforage.setItem(answerId, {
         id: answerId,
-        questionId: "practice",
-        part: selectedPart,
-        questionText: `Practice: ${selectedPart}`,
+        questionId: currentPracticeQ.id,
+        part: currentPracticeQ.part,
+        questionText: currentPracticeQ.text,
         audioUrl,
         audioBlob: blob,
         transcript: null,
@@ -384,6 +383,7 @@ const LessonLabAssistant: React.FC = () => {
         initialTime = MOCK_TEST_1[currentQuestionIndex].timeLimit;
       } else {
         if (selectedPart === "Qism 1.2 (Picture)") initialTime = 45;
+        else if (selectedPart === "Qism 2 (Cue Card)" || selectedPart === "Qism 3 (Discussion)") initialTime = 120;
       }
       setTimeLeft(initialTime);
 
@@ -699,7 +699,7 @@ const LessonLabAssistant: React.FC = () => {
         >
           <div className="text-right hidden sm:block">
             <div className="text-sm font-bold text-[#1E293B]">{userProfile.name}</div>
-            <div className="text-xs text-gray-500">+998907252040</div>
+            <div className="text-xs text-gray-500">{userProfile.targetCEFR} daraja</div>
           </div>
           <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white">
             <User size={18} />
@@ -751,7 +751,7 @@ const LessonLabAssistant: React.FC = () => {
                   </select>
                 </div>
                 <div className="text-sm text-gray-500 border border-gray-200 px-4 py-1.5 rounded bg-gray-50">
-                  По умолчанию - Набор микрофонов...
+                  Standart mikrofon
                 </div>
               </div>
               <div className="h-1 w-full bg-[#E87722]"></div>
@@ -764,11 +764,11 @@ const LessonLabAssistant: React.FC = () => {
                 >
                   <Bot size={24} className="text-emerald-600" />
                   <span className="text-emerald-900 font-bold text-sm tracking-wide uppercase">
-                    AI TUTOR
+                    AI TUTOR bilan suhbat
                   </span>
                 </button>
                 <h2 className="text-[#E87722] font-bold text-xl mb-4 tracking-wide uppercase">
-                  Practice Mode
+                  Mashq rejimi
                 </h2>
 
                 {/* Display Practice Question */}
@@ -845,10 +845,18 @@ const LessonLabAssistant: React.FC = () => {
                           ))}
                     </div>
 
-                    {!isLive && !isStartingLive ? (
+                    {!isLive && !isStartingLive && !isPrepTime ? (
                       <div className="flex flex-col md:flex-row gap-4">
                         <button
-                          onClick={() => startLiveSession(false)}
+                          onClick={() => {
+                            const currentQ = MOCK_TEST_1[practiceQuestionIndex];
+                            if (currentQ.prepTime && !isPrepTime) {
+                              setIsPrepTime(true);
+                              setPrepTimeLeft(currentQ.prepTime);
+                            } else {
+                              startLiveSession(false);
+                            }
+                          }}
                           className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5"
                         >
                           <Mic size={20} />
@@ -871,16 +879,28 @@ const LessonLabAssistant: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Prep Time (for Qism 2 & 3) */}
+                  {isPrepTime && (
+                    <div className="flex flex-col items-center justify-center gap-3 mt-8">
+                      <AlertTriangle size={32} className="text-amber-500" />
+                      <div className="text-[#1E293B] font-bold">Tayyorlanish vaqti</div>
+                      <div className="font-bold text-3xl text-amber-600 animate-pulse">
+                        {prepTimeLeft} soniya
+                      </div>
+                      <p className="text-sm text-gray-500">Fikrlaringizni jamlang...</p>
+                    </div>
+                  )}
+
                   {/* Speak Time */}
                   <div className="flex flex-col items-center justify-center gap-3 mt-8">
                     <Clock size={32} className="text-[#1E293B]" />
                     <div className="text-[#1E293B] font-bold">
-                      Qolgan vaqt
+                      Javob berish vaqti
                     </div>
                     <div
                       className={`font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
-                      {timeLeft !== null ? `${timeLeft} second` : `${selectedPart === "Qism 1.2 (Picture)" ? 45 : 30} second`}
+                      {timeLeft !== null ? `${timeLeft} soniya` : `${selectedPart === "Qism 1.2 (Picture)" ? 45 : selectedPart.includes("Qism 2") || selectedPart.includes("Qism 3") ? 120 : 30} soniya`}
                     </div>
                   </div>
                 </div>
@@ -1021,9 +1041,9 @@ const LessonLabAssistant: React.FC = () => {
                       className={`font-bold text-xl ${isPrepTime ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
                       {isPrepTime
-                        ? `${prepTimeLeft} second`
+                        ? `${prepTimeLeft} soniya`
                         : MOCK_TEST_1[currentQuestionIndex].prepTime
-                          ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} second`
+                          ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} soniya`
                           : "Yo'q"}
                     </div>
                   </div>
@@ -1097,8 +1117,8 @@ const LessonLabAssistant: React.FC = () => {
                       className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
                     >
                       {isLive && timeLeft !== null
-                        ? `${timeLeft} second`
-                        : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} second`}
+                        ? `${timeLeft} soniya`
+                        : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} soniya`}
                     </div>
                   </div>
                 </div>

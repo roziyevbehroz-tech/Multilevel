@@ -72,8 +72,8 @@ Whenever the user asks for analysis of their answer, you must structure your res
 
 export class GeminiService {
   private ai: GoogleGenAI;
-  private model: string = "gemini-3.1-pro-preview";
-  private liveModel: string = "gemini-2.5-flash-native-audio-preview-12-2025";
+  private model: string = "gemini-2.5-flash-preview-05-20";
+  private liveModel: string = "gemini-2.5-flash-preview-native-audio-dialog";
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
