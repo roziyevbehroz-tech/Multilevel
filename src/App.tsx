@@ -900,16 +900,70 @@ AGAINST3: [argument against]`,
       )}
 
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#1E73BE] text-white px-2 py-1 rounded text-xs font-bold">
-            ML
+      <header className="bg-white border-b border-gray-200 flex flex-col">
+        {/* Top row: Logo + Profile */}
+        <div className="h-14 flex items-center justify-between px-4 md:px-6">
+          <div className="flex items-center gap-2">
+            <div className="bg-[#1E73BE] text-white px-2 py-1 rounded text-xs font-bold">
+              ML
+            </div>
+            <span className="font-bold text-[#1E293B] tracking-wide text-sm md:text-base">
+              MULTI-LEVEL
+            </span>
           </div>
-          <span className="font-bold text-[#1E293B] tracking-wide">
-            MULTI-LEVEL
-          </span>
+          {/* Desktop mode buttons */}
+          <div className="hidden md:flex items-center gap-4">
+            <button
+              onClick={() => {
+                isSwitchingModeRef.current = true;
+                stopLiveSession();
+                setIsPrepTime(false);
+                setPrepTimeLeft(null);
+                setExamMode("practice");
+                setPracticeSelectedSet(null);
+                setPracticeQIndex(0);
+                setUserAudioUrl(null);
+                setRecordedChunks([]);
+                setLastSavedPracticeAnswer(null);
+              }}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode === "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+            >
+              Practice Mode
+            </button>
+            <button
+              onClick={() => {
+                isSwitchingModeRef.current = true;
+                stopLiveSession();
+                setIsPrepTime(false);
+                setPrepTimeLeft(null);
+                setMockSessionId(Date.now().toString());
+                setCurrentQuestionIndex(0);
+                setMockAnswers([]);
+                setExamMode("mock_running");
+                setIsBreakTime(false);
+                setBreakTimeLeft(null);
+                setIsContinuousMockRunning(false);
+              }}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode !== "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+            >
+              Mock Exam
+            </button>
+          </div>
+          <button
+            onClick={() => setShowProfile(true)}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
+            <div className="text-right hidden sm:block">
+              <div className="text-sm font-bold text-[#1E293B]">{userProfile.name}</div>
+              <div className="text-xs text-gray-500">{userProfile.targetCEFR} daraja</div>
+            </div>
+            <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white">
+              <User size={18} />
+            </div>
+          </button>
         </div>
-        <div className="hidden md:flex items-center gap-4">
+        {/* Mobile mode tabs — always visible on small screens */}
+        <div className="flex md:hidden border-t border-gray-100">
           <button
             onClick={() => {
               isSwitchingModeRef.current = true;
@@ -923,9 +977,9 @@ AGAINST3: [argument against]`,
               setRecordedChunks([]);
               setLastSavedPracticeAnswer(null);
             }}
-            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode === "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+            className={`flex-1 py-2.5 text-center text-sm font-bold transition-colors ${examMode === "practice" ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50" : "text-gray-500"}`}
           >
-            Practice Mode
+            Practice
           </button>
           <button
             onClick={() => {
@@ -941,23 +995,11 @@ AGAINST3: [argument against]`,
               setBreakTimeLeft(null);
               setIsContinuousMockRunning(false);
             }}
-            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode !== "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
+            className={`flex-1 py-2.5 text-center text-sm font-bold transition-colors ${examMode !== "practice" ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50" : "text-gray-500"}`}
           >
             Mock Exam
           </button>
         </div>
-        <button
-          onClick={() => setShowProfile(true)}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-        >
-          <div className="text-right hidden sm:block">
-            <div className="text-sm font-bold text-[#1E293B]">{userProfile.name}</div>
-            <div className="text-xs text-gray-500">{userProfile.targetCEFR} daraja</div>
-          </div>
-          <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white">
-            <User size={18} />
-          </div>
-        </button>
       </header>
 
       {examMode === "practice" && (
