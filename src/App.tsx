@@ -17,7 +17,7 @@ import ReactMarkdown from "react-markdown";
 
 import localforage from "localforage";
 import { gemini } from "./services/gemini";
-import { ExamStage, CEFRLevel, Message, ExamState, SavedAnswer, AnalysisPreferences } from "./types";
+import { Message, SavedAnswer, AnalysisPreferences } from "./types";
 import { AITeacherPanel } from "./components/AITeacherPanel";
 import { HistorySidebar } from "./components/HistorySidebar";
 import { ProfileSection } from "./components/ProfileSection";
@@ -30,77 +30,111 @@ export type MockQuestion = {
   timeLimit: number;
   prepTime?: number;
   imageUrls?: string[];
+  subQuestions?: string[];
   part3Data?: { topic: string; for: string[]; against: string[] };
 };
 
+// Part intro instructions shown before each section
+const PART_INTROS: Record<string, string> = {
+  "Qism 1.1": "Part one. In this part, I'm going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.",
+  "Qism 1.2": "Now, I'm going to ask you to compare two pictures and I will ask you two questions about them. Look at the photographs.",
+  "Qism 2": "Part two. In this part, I'm going to show you a picture and ask you three questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound. Look at the photograph.",
+  "Qism 3": "Part three. In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points — for and against — related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.",
+};
+
 const MOCK_TEST_1: MockQuestion[] = [
+  // ═══════════════════════════════════════════════════
+  // QISM 1.1 (A1-A2): 3 shaxsiy savollar, 30s har biri, tayyorgarlik yo'q
+  // ═══════════════════════════════════════════════════
   {
     id: "1.1.1",
     part: "Qism 1.1",
-    text: "What do you do on weekends?",
+    text: "Please tell me about your best friend.",
     timeLimit: 30,
   },
   {
     id: "1.1.2",
     part: "Qism 1.1",
-    text: "What is your favourite drink?",
+    text: "Tell me about your country.",
     timeLimit: 30,
   },
   {
     id: "1.1.3",
     part: "Qism 1.1",
-    text: "Do you wake up early?",
+    text: "What do you like to do in your free time?",
     timeLimit: 30,
   },
+  // ═══════════════════════════════════════════════════
+  // QISM 1.2 (B1): 2 rasm asosida 3 savol, Q4=45s, Q5-6=30s, tayyorgarlik yo'q
+  // ═══════════════════════════════════════════════════
   {
     id: "1.2.1",
     part: "Qism 1.2",
     text: "What do you see in these pictures?",
     timeLimit: 45,
     imageUrls: [
-      "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800"
+      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
     ],
   },
   {
     id: "1.2.2",
     part: "Qism 1.2",
-    text: "What are the advantages of reading a book over watching a TV?",
+    text: "What are some advantages of walking over driving?",
     timeLimit: 30,
+    imageUrls: [
+      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
+    ],
   },
   {
     id: "1.2.3",
     part: "Qism 1.2",
-    text: "Do you agree that people read books less now than the past?",
+    text: "Why do some people prefer having a car of their own?",
     timeLimit: 30,
+    imageUrls: [
+      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
+      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
+    ],
   },
+  // ═══════════════════════════════════════════════════
+  // QISM 2 (B2): 1 rasm + 3 savol birga, 60s tayyorgarlik, 120s gapirish
+  // ═══════════════════════════════════════════════════
   {
     id: "2.1",
     part: "Qism 2",
-    text: "Tell me about a moment you had to be honest although it was difficult.\n• How did the other person react to your honesty?\n• Why do you think being honest is important, even in challenging situations?",
+    text: "Look at the photograph and answer the following questions.",
     timeLimit: 120,
     prepTime: 60,
     imageUrls: [
-      "https://images.unsplash.com/photo-1521747116042-5a810fda9664?auto=format&fit=crop&q=80&w=800"
+      "https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800",
+    ],
+    subQuestions: [
+      "Tell me about a critical decision you have made.",
+      "How has this decision influenced you and your life?",
+      "What factors have the highest impact on the decisions people make?",
     ],
   },
+  // ═══════════════════════════════════════════════════
+  // QISM 3 (C1): 1 mavzu FOR/AGAINST, 60s tayyorgarlik, 120s gapirish
+  // ═══════════════════════════════════════════════════
   {
     id: "3.1",
     part: "Qism 3",
-    text: "All students should learn a second language.",
+    text: "Citizens should be allowed to carry personal guns.",
     timeLimit: 120,
     prepTime: 60,
     part3Data: {
-      topic: "All students should learn a second language.",
+      topic: "Citizens should be allowed to carry personal guns.",
       for: [
-        "Improves cognitive abilities like memory and problem-solving.",
-        "Enhances career opportunities in a globalized job market.",
-        "Promotes cultural understanding and global communication skills.",
+        "Guns can help people protect themselves",
+        "They prevent people from becoming victims of crimes like burglary",
+        "Necessary for hunting or target sports",
       ],
       against: [
-        "Not all students are interested or skilled in languages.",
-        "Time could be spent on more essential subjects.",
-        "Translation technology reduces the need for learning languages.",
+        "Guns are weapons that are used to commit a crime",
+        "Fewer guns will reduce the murder rate",
+        "Small or military guns are not useful for activities like hunting",
       ],
     },
   },
@@ -273,7 +307,7 @@ const LessonLabAssistant: React.FC = () => {
       const nextQ = MOCK_TEST_1[currentQuestionIndex + 1];
       if (nextQ.part !== currentQ.part) {
         setIsBreakTime(true);
-        setBreakTimeLeft(5);
+        setBreakTimeLeft(10);
         setCurrentQuestionIndex((prev) => prev + 1);
       } else {
         setCurrentQuestionIndex((prev) => prev + 1);
@@ -789,6 +823,21 @@ const LessonLabAssistant: React.FC = () => {
                   <div className="text-[#1E293B] font-bold text-xl md:text-2xl text-center whitespace-pre-line">
                     {MOCK_TEST_1[practiceQuestionIndex].text}
                   </div>
+
+                  {/* Sub-questions for Qism 2 */}
+                  {MOCK_TEST_1[practiceQuestionIndex].subQuestions && (
+                    <div className="w-full max-w-3xl mt-6">
+                      <ul className="space-y-3 text-left">
+                        {MOCK_TEST_1[practiceQuestionIndex].subQuestions?.map((q, i) => (
+                          <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {MOCK_TEST_1[practiceQuestionIndex].part3Data && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-6 text-left">
                       <div className="bg-green-50 p-6 rounded-xl border border-green-200">
@@ -959,9 +1008,27 @@ const LessonLabAssistant: React.FC = () => {
             <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
               <div className="font-bold text-[#1E293B] uppercase">
                 {MOCK_TEST_1[currentQuestionIndex].part}
+                <span className="text-xs text-gray-400 ml-2 normal-case">
+                  ({MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.1" ? "A1-A2" :
+                    MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.2" ? "B1" :
+                    MOCK_TEST_1[currentQuestionIndex].part === "Qism 2" ? "B2" : "C1"})
+                </span>
               </div>
-              <div className="text-sm font-bold text-indigo-600">
-                Savol {currentQuestionIndex + 1} / {MOCK_TEST_1.length}
+              <div className="flex items-center gap-3">
+                <div className="text-sm font-bold text-indigo-600">
+                  Savol {currentQuestionIndex + 1} / {MOCK_TEST_1.length}
+                </div>
+                <div className="flex gap-1">
+                  {MOCK_TEST_1.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full ${
+                        i < currentQuestionIndex ? "bg-green-500" :
+                        i === currentQuestionIndex ? "bg-indigo-600" : "bg-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
             <div className="h-1 w-full bg-[#E87722]"></div>
@@ -975,14 +1042,29 @@ const LessonLabAssistant: React.FC = () => {
               </div>
 
               {isBreakTime ? (
-                <div className="text-center py-16">
-                  <h2 className="text-3xl font-bold text-indigo-600 mb-4 animate-pulse">
-                    Keyingi: {MOCK_TEST_1[currentQuestionIndex].part}
+                <div className="text-center py-8 max-w-3xl mx-auto">
+                  <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-bold mb-6">
+                    <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
+                    {MOCK_TEST_1[currentQuestionIndex].part}
+                  </div>
+                  <h2 className="text-2xl font-bold text-[#1E293B] mb-6">
+                    {MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.1" ? "Part 1.1" :
+                     MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.2" ? "Part 1.2" :
+                     MOCK_TEST_1[currentQuestionIndex].part === "Qism 2" ? "Part 2" : "Part 3"}
                   </h2>
-                  <p className="text-xl text-gray-500 mb-8">Nafas rostlab oling...</p>
-                  <div className="text-6xl font-bold text-indigo-600 mb-8">
+                  <p className="text-gray-600 italic text-base leading-relaxed mb-8 text-left">
+                    {PART_INTROS[MOCK_TEST_1[currentQuestionIndex].part]}
+                  </p>
+                  <div className="text-5xl font-bold text-indigo-600 mb-4">
                     {breakTimeLeft}
                   </div>
+                  <p className="text-sm text-gray-400">Tayyor bo'ling...</p>
+                  <button
+                    onClick={() => setBreakTimeLeft(0)}
+                    className="mt-4 text-sm text-indigo-600 hover:text-indigo-800 underline font-medium"
+                  >
+                    O'tkazib yuborish →
+                  </button>
                 </div>
               ) : (
                 <>
@@ -1000,9 +1082,23 @@ const LessonLabAssistant: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-12 text-center max-w-3xl whitespace-pre-line">
+                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-6 text-center max-w-3xl whitespace-pre-line">
                     {MOCK_TEST_1[currentQuestionIndex].text}
                   </div>
+
+                  {/* Sub-questions for Qism 2 */}
+                  {MOCK_TEST_1[currentQuestionIndex].subQuestions && (
+                    <div className="w-full max-w-3xl mb-12">
+                      <ul className="space-y-4 text-left">
+                        {MOCK_TEST_1[currentQuestionIndex].subQuestions?.map((q, i) => (
+                          <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {MOCK_TEST_1[currentQuestionIndex].part3Data && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
@@ -1075,11 +1171,14 @@ const LessonLabAssistant: React.FC = () => {
                       <button
                         onClick={() => {
                           setIsContinuousMockRunning(true);
-                          startPrepOrLive();
+                          // Show part intro before first question
+                          setIsBreakTime(true);
+                          setBreakTimeLeft(8);
                         }}
                         className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
                       >
-                        BOSHLASH
+                        <Mic size={20} />
+                        IMTIHONNI BOSHLASH
                       </button>
                     ) : isStartingLive ? (
                       <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
