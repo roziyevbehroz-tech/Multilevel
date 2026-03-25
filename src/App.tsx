@@ -596,110 +596,114 @@ const LessonLabAssistant: React.FC = () => {
       recorder.start();
       mediaRecorderRef.current = recorder;
 
-      // Setup AudioWorklet for Live API
-      await ctx.audioWorklet.addModule(
-        URL.createObjectURL(
-          new Blob(
-            [
-              `
-        class AudioProcessor extends AudioWorkletProcessor {
-          process(inputs, outputs, parameters) {
-            const input = inputs[0][0];
-            if (input) {
-              const pcm = new Int16Array(input.length);
-              for (let i = 0; i < input.length; i++) {
-                pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
-              }
-              this.port.postMessage(pcm);
-            }
-            return true;
-          }
-        }
-        registerProcessor('audio-processor', AudioProcessor);
-      `,
-            ],
-            { type: "application/javascript" },
-          ),
-        ),
-      );
+      // Recording is now LIVE — set state immediately (don't wait for WebSocket)
+      setIsLive(true);
+      setIsStartingLive(false);
 
-      const processor = new AudioWorkletNode(ctx, "audio-processor");
-      source.connect(processor);
-      setAudioWorkletNode(processor);
-
-      const callbacks = {
-        onopen: () => {
-          setIsLive(true);
-          setIsStartingLive(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "model",
-              text: "Men eshityapman. Javobingizni boshlashingiz mumkin.",
-              timestamp: Date.now(),
-            },
-          ]);
-        },
-        onmessage: async (message: any) => {
-          if (message.serverContent?.modelTurn?.parts) {
-            const parts = message.serverContent.modelTurn.parts;
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                const base64 = part.inlineData.data;
-                const binary = atob(base64);
-                const pcm = new Int16Array(binary.length / 2);
-                for (let i = 0; i < pcm.length; i++) {
-                  pcm[i] =
-                    binary.charCodeAt(i * 2) |
-                    (binary.charCodeAt(i * 2 + 1) << 8);
+      // Setup AudioWorklet + Gemini Live connection (non-blocking)
+      // If this fails, recording still works — just no AI feedback in real-time
+      try {
+        await ctx.audioWorklet.addModule(
+          URL.createObjectURL(
+            new Blob(
+              [
+                `
+          class AudioProcessor extends AudioWorkletProcessor {
+            process(inputs, outputs, parameters) {
+              const input = inputs[0][0];
+              if (input) {
+                const pcm = new Int16Array(input.length);
+                for (let i = 0; i < input.length; i++) {
+                  pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
                 }
-                playAudioChunk(pcm, ctx);
+                this.port.postMessage(pcm);
               }
-              if (part.text) {
-                setMessages((prev) => [
-                  ...prev,
-                  { role: "model", text: part.text, timestamp: Date.now() },
-                ]);
-              }
+              return true;
             }
           }
-        },
-        onerror: (err: any) => {
-          console.error("Live Error:", err);
-          setIsStartingLive(false);
-        },
-        onclose: () => {
-          setIsLive(false);
-          setIsStartingLive(false);
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            stopLiveSession(true);
+          registerProcessor('audio-processor', AudioProcessor);
+        `,
+              ],
+              { type: "application/javascript" },
+            ),
+          ),
+        );
+
+        const processor = new AudioWorkletNode(ctx, "audio-processor");
+        source.connect(processor);
+        setAudioWorkletNode(processor);
+
+        const callbacks = {
+          onopen: () => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "model",
+                text: "Men eshityapman. Javobingizni boshlashingiz mumkin.",
+                timestamp: Date.now(),
+              },
+            ]);
+          },
+          onmessage: async (message: any) => {
+            if (message.serverContent?.modelTurn?.parts) {
+              const parts = message.serverContent.modelTurn.parts;
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  const base64 = part.inlineData.data;
+                  const binary = atob(base64);
+                  const pcm = new Int16Array(binary.length / 2);
+                  for (let i = 0; i < pcm.length; i++) {
+                    pcm[i] =
+                      binary.charCodeAt(i * 2) |
+                      (binary.charCodeAt(i * 2 + 1) << 8);
+                  }
+                  playAudioChunk(pcm, ctx);
+                }
+                if (part.text) {
+                  setMessages((prev) => [
+                    ...prev,
+                    { role: "model", text: part.text, timestamp: Date.now() },
+                  ]);
+                }
+              }
+            }
+          },
+          onerror: (err: any) => {
+            console.error("Live API Error (recording continues):", err);
+          },
+          onclose: () => {
+            console.log("Live API connection closed (recording continues)");
+          },
+        };
+
+        const sessionPromise = isTutorMode ? gemini.connectTutorLive(callbacks) : gemini.connectLive(callbacks);
+
+        processor.port.onmessage = (e) => {
+          const pcm = e.data;
+          const bytes = new Uint8Array(pcm.buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
           }
-        },
-      };
+          const base64 = btoa(binary);
+          sessionPromise
+            .then((session) => {
+              session.sendRealtimeInput({
+                audio: { data: base64, mimeType: "audio/pcm;rate=16000" },
+              });
+            })
+            .catch(() => {}); // Silently ignore if session failed
+        };
 
-      const sessionPromise = isTutorMode ? gemini.connectTutorLive(callbacks) : gemini.connectLive(callbacks);
-
-      processor.port.onmessage = (e) => {
-        const pcm = e.data;
-        const bytes = new Uint8Array(pcm.buffer);
-        let binary = "";
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const base64 = btoa(binary);
-        sessionPromise
-          .then((session) => {
-            session.sendRealtimeInput({
-              audio: { data: base64, mimeType: "audio/pcm;rate=16000" },
-            });
-          })
-          .catch((err) => console.error(err));
-      };
-
-      setSession(sessionPromise);
+        setSession(sessionPromise);
+      } catch (aiErr) {
+        console.warn("AI Live connection failed, recording continues locally:", aiErr);
+        // Recording is still working — just no real-time AI
+      }
     } catch (err) {
       console.error("Live Session Error:", err);
       setIsStartingLive(false);
+      setIsLive(false);
     }
   };
 
@@ -1586,7 +1590,15 @@ AGAINST3: [argument against]`,
                         <Square size={20} fill="currentColor" />
                         YAKUNLASH
                       </button>
-                    ) : null}
+                    ) : (
+                      <button
+                        onClick={() => startLiveSession()}
+                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                      >
+                        <Mic size={20} />
+                        YOZISHNI BOSHLASH
+                      </button>
+                    )}
                   </div>
 
                   {/* Speak Time */}
