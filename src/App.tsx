@@ -26,14 +26,6 @@ import { HistorySidebar } from "./components/HistorySidebar";
 import { ProfileSection } from "./components/ProfileSection";
 import { MOCK_TESTS } from "./mockTests";
 
-// Part intro instructions shown before each section
-const PART_INTROS: Record<string, string> = {
-  "Qism 1.1": "Part one. In this part, I'm going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.",
-  "Qism 1.2": "Now, I'm going to ask you to compare two pictures and I will ask you two questions about them. Look at the photographs.",
-  "Qism 2": "Part two. In this part, I'm going to show you a picture and ask you three questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound. Look at the photograph.",
-  "Qism 3": "Part three. In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points — for and against — related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.",
-};
-
 // Mock tests are imported from ./mockTests
 
 type PracticeSet = {
@@ -200,6 +192,7 @@ const LessonLabAssistant: React.FC = () => {
 
   // Mock test selection
   const [selectedMockTest, setSelectedMockTest] = useState<MockTestSet | null>(null);
+  const [showMockIntro, setShowMockIntro] = useState(false);
 
   // Practice mode states
   const [practiceTab, setPracticeTab] = useState<string>("Qism 1.1");
@@ -379,19 +372,11 @@ const LessonLabAssistant: React.FC = () => {
       setUserAudioUrl(null);
       setRecordedChunks([]);
 
-      if (nextQ.part !== currentQ.part) {
-        // Different part — show break/intro screen
-        setCurrentQuestionIndex(qIdx + 1);
-        setTransitionKey(prev => prev + 1);
-        setIsBreakTime(true);
-        setBreakTimeLeft(10);
-      } else {
-        // Same part — advance and immediately start prep countdown
-        setCurrentQuestionIndex(qIdx + 1);
-        setTransitionKey(prev => prev + 1);
-        setIsPrepTime(true);
-        setPrepTimeLeft(nextQ.prepTime || 5);
-      }
+      // Advance to next question — start prep countdown directly
+      setCurrentQuestionIndex(qIdx + 1);
+      setTransitionKey(prev => prev + 1);
+      setIsPrepTime(true);
+      setPrepTimeLeft(nextQ.prepTime || 5);
     } else {
       setExamMode("mock_finished");
       setIsContinuousMockRunning(false);
@@ -1368,13 +1353,14 @@ AGAINST3: [argument against]`,
                   key={test.id}
                   onClick={() => {
                     setSelectedMockTest(test);
+                    setShowMockIntro(true);
+                    setExamMode("mock_running");
                     setMockSessionId(Date.now().toString());
                     setCurrentQuestionIndex(0);
                     setMockAnswers([]);
                     setIsBreakTime(false);
                     setBreakTimeLeft(null);
                     setIsContinuousMockRunning(false);
-                    setExamMode("mock_running");
                   }}
                   className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-indigo-400 hover:shadow-md transition-all group"
                 >
@@ -1408,6 +1394,90 @@ AGAINST3: [argument against]`,
 
       {examMode === "mock_running" && (
         <main className="max-w-5xl mx-auto px-6 mt-8">
+          {showMockIntro ? (
+            /* ═══ MOCK INTRO — Full exam overview ═══ */
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div className="font-bold text-[#1E293B]">{selectedMockTest?.title || "Mock Test"}</div>
+                <button
+                  onClick={() => { setShowMockIntro(false); setExamMode("mock_setup"); setSelectedMockTest(null); }}
+                  className="text-xs text-gray-500 hover:text-gray-800 font-bold"
+                >
+                  ← Ortga
+                </button>
+              </div>
+              <div className="h-1 w-full bg-[#E87722]"></div>
+              <div className="p-6 md:p-10">
+                <h2 className="text-xl font-bold text-center text-[#1E293B] mb-2">Mock Exam Tuzilishi</h2>
+                <p className="text-sm text-gray-500 text-center mb-8">Imtihon 4 qismdan iborat. Har bir qism haqida quyida batafsil:</p>
+
+                <div className="space-y-4">
+                  {/* Part 1.1 */}
+                  <div className="border border-sky-200 rounded-xl p-4 bg-sky-50/50">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-sky-600 text-white rounded-lg flex items-center justify-center text-xs font-bold shrink-0">1.1</div>
+                      <div>
+                        <h3 className="font-bold text-[#1E293B] text-sm">Part 1.1 — Shaxsiy savollar</h3>
+                        <span className="text-[10px] bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full font-bold">A1-A2</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">3 ta oddiy savol. Har bir savolga <strong>30 soniya</strong> javob berish vaqti. Tayyorgarlik vaqti yo'q. O'zingiz haqingizda gapiring.</p>
+                  </div>
+
+                  {/* Part 1.2 */}
+                  <div className="border border-teal-200 rounded-xl p-4 bg-teal-50/50">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-teal-600 text-white rounded-lg flex items-center justify-center text-xs font-bold shrink-0">1.2</div>
+                      <div>
+                        <h3 className="font-bold text-[#1E293B] text-sm">Part 1.2 — Rasmlarni taqqoslash</h3>
+                        <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-bold">B1</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">2 ta rasm ko'rsatiladi va 3 ta savol beriladi. Birinchi savolga <strong>45 soniya</strong>, qolganlariga <strong>30 soniya</strong>. Rasmlarni taqqoslab gapiring.</p>
+                  </div>
+
+                  {/* Part 2 */}
+                  <div className="border border-violet-200 rounded-xl p-4 bg-violet-50/50">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-violet-600 text-white rounded-lg flex items-center justify-center text-xs font-bold shrink-0">2</div>
+                      <div>
+                        <h3 className="font-bold text-[#1E293B] text-sm">Part 2 — Batafsil hikoya</h3>
+                        <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-bold">B2</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">1 ta mavzu va 3-4 ta yo'naltiruvchi savol. <strong>1 daqiqa</strong> tayyorgarlik, <strong>2 daqiqa</strong> javob berish. Batafsil gapiring.</p>
+                  </div>
+
+                  {/* Part 3 */}
+                  <div className="border border-rose-200 rounded-xl p-4 bg-rose-50/50">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-rose-600 text-white rounded-lg flex items-center justify-center text-xs font-bold shrink-0">3</div>
+                      <div>
+                        <h3 className="font-bold text-[#1E293B] text-sm">Part 3 — Munozara (FOR / AGAINST)</h3>
+                        <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">C1</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">1 ta mavzu, FOR va AGAINST dalillar beriladi. <strong>1 daqiqa</strong> tayyorgarlik, <strong>2 daqiqa</strong> javob. Har ikkala tomonni muvozanatli ko'rsating.</p>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={() => {
+                      setShowMockIntro(false);
+                      setIsContinuousMockRunning(true);
+                      setIsPrepTime(true);
+                      setPrepTimeLeft(5);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3.5 rounded-full font-bold text-lg transition-colors shadow-lg flex items-center gap-2"
+                  >
+                    <Play size={20} fill="currentColor" />
+                    Imtihonni Boshlash
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
               <div className="font-bold text-[#1E293B] uppercase">
@@ -1456,38 +1526,6 @@ AGAINST3: [argument against]`,
             <div className="h-1 w-full bg-[#E87722]"></div>
 
             <div className="p-8 md:p-12 flex flex-col items-center">
-              {isBreakTime ? (
-                <motion.div
-                  key={`break-${currentQuestionIndex}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.4 }}
-                  className="text-center py-8 max-w-3xl mx-auto">
-                  <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-bold mb-6">
-                    <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
-                    {activeMockQuestions[currentQuestionIndex].part}
-                  </div>
-                  <h2 className="text-2xl font-bold text-[#1E293B] mb-6">
-                    {activeMockQuestions[currentQuestionIndex].part === "Qism 1.1" ? "Part 1.1" :
-                     activeMockQuestions[currentQuestionIndex].part === "Qism 1.2" ? "Part 1.2" :
-                     activeMockQuestions[currentQuestionIndex].part === "Qism 2" ? "Part 2" : "Part 3"}
-                  </h2>
-                  <p className="text-gray-600 italic text-base leading-relaxed mb-8 text-left">
-                    {PART_INTROS[activeMockQuestions[currentQuestionIndex].part]}
-                  </p>
-                  <div className="text-5xl font-bold text-indigo-600 mb-4">
-                    {breakTimeLeft}
-                  </div>
-                  <p className="text-sm text-gray-400">Tayyor bo'ling...</p>
-                  <button
-                    onClick={() => setBreakTimeLeft(0)}
-                    className="mt-4 text-sm text-indigo-600 hover:text-indigo-800 underline font-medium"
-                  >
-                    O'tkazib yuborish →
-                  </button>
-                </motion.div>
-              ) : (
                 <motion.div
                   key={`q-${transitionKey}`}
                   initial={{ opacity: 0, x: 40 }}
@@ -1546,9 +1584,7 @@ AGAINST3: [argument against]`,
                     </div>
                   )}
                 </motion.div>
-              )}
 
-              {!isBreakTime && (
                 <div className="flex flex-col items-center w-full gap-5">
                   {/* Unified Timer — switches between prep and recording with animation */}
                   <AnimatePresence mode="wait">
@@ -1643,21 +1679,17 @@ AGAINST3: [argument against]`,
                       <Loader2 size={20} className="animate-spin" />
                       ULANMOQDA...
                     </div>
-                  ) : isPrepTime || isBreakTime ? (
+                  ) : isPrepTime ? (
                     <button
                       onClick={() => {
-                        if (isBreakTime) {
-                          setBreakTimeLeft(0);
-                        } else if (isPrepTime) {
-                          setIsPrepTime(false);
-                          setPrepTimeLeft(null);
-                          startLiveSession();
-                        }
+                        setIsPrepTime(false);
+                        setPrepTimeLeft(null);
+                        startLiveSession();
                       }}
                       className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
                     >
                       <ArrowRight size={20} />
-                      {isBreakTime ? "BOSHLASH" : "GAPIRISHNI BOSHLASH"}
+                      GAPIRISHNI BOSHLASH
                     </button>
                   ) : isLive ? (
                     <button
@@ -1677,9 +1709,9 @@ AGAINST3: [argument against]`,
                     </button>
                   )}
                 </div>
-              )}
             </div>
           </div>
+          )}
         </main>
       )}
 
