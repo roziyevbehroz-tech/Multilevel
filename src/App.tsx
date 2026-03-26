@@ -20,22 +20,11 @@ import ReactMarkdown from "react-markdown";
 
 import localforage from "localforage";
 import { gemini } from "./services/gemini";
-import { Message, SavedAnswer, AnalysisPreferences } from "./types";
+import { Message, SavedAnswer, AnalysisPreferences, MockQuestion, MockTestSet, UserProfile } from "./types";
 import { AITeacherPanel } from "./components/AITeacherPanel";
 import { HistorySidebar } from "./components/HistorySidebar";
 import { ProfileSection } from "./components/ProfileSection";
-import { UserProfile } from "./types";
-
-export type MockQuestion = {
-  id: string;
-  part: string;
-  text: string;
-  timeLimit: number;
-  prepTime?: number;
-  imageUrls?: string[];
-  subQuestions?: string[];
-  part3Data?: { topic: string; for: string[]; against: string[] };
-};
+import { MOCK_TESTS } from "./mockTests";
 
 // Part intro instructions shown before each section
 const PART_INTROS: Record<string, string> = {
@@ -45,103 +34,7 @@ const PART_INTROS: Record<string, string> = {
   "Qism 3": "Part three. In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points — for and against — related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.",
 };
 
-const MOCK_TEST_1: MockQuestion[] = [
-  // ═══════════════════════════════════════════════════
-  // QISM 1.1 (A1-A2): 3 shaxsiy savollar, 30s har biri, tayyorgarlik yo'q
-  // ═══════════════════════════════════════════════════
-  {
-    id: "1.1.1",
-    part: "Qism 1.1",
-    text: "Please tell me about your best friend.",
-    timeLimit: 30,
-  },
-  {
-    id: "1.1.2",
-    part: "Qism 1.1",
-    text: "Tell me about your country.",
-    timeLimit: 30,
-  },
-  {
-    id: "1.1.3",
-    part: "Qism 1.1",
-    text: "What do you like to do in your free time?",
-    timeLimit: 30,
-  },
-  // ═══════════════════════════════════════════════════
-  // QISM 1.2 (B1): 2 rasm asosida 3 savol, Q4=45s, Q5-6=30s, tayyorgarlik yo'q
-  // ═══════════════════════════════════════════════════
-  {
-    id: "1.2.1",
-    part: "Qism 1.2",
-    text: "What do you see in these pictures?",
-    timeLimit: 45,
-    imageUrls: [
-      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    id: "1.2.2",
-    part: "Qism 1.2",
-    text: "What are some advantages of walking over driving?",
-    timeLimit: 30,
-    imageUrls: [
-      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  {
-    id: "1.2.3",
-    part: "Qism 1.2",
-    text: "Why do some people prefer having a car of their own?",
-    timeLimit: 30,
-    imageUrls: [
-      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1519817914152-22d216bb9170?auto=format&fit=crop&q=80&w=800",
-    ],
-  },
-  // ═══════════════════════════════════════════════════
-  // QISM 2 (B2): 1 rasm + 3 savol birga, 60s tayyorgarlik, 120s gapirish
-  // ═══════════════════════════════════════════════════
-  {
-    id: "2.1",
-    part: "Qism 2",
-    text: "Look at the photograph and answer the following questions.",
-    timeLimit: 120,
-    prepTime: 60,
-    imageUrls: [
-      "https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800",
-    ],
-    subQuestions: [
-      "Tell me about a critical decision you have made.",
-      "How has this decision influenced you and your life?",
-      "What factors have the highest impact on the decisions people make?",
-    ],
-  },
-  // ═══════════════════════════════════════════════════
-  // QISM 3 (C1): 1 mavzu FOR/AGAINST, 60s tayyorgarlik, 120s gapirish
-  // ═══════════════════════════════════════════════════
-  {
-    id: "3.1",
-    part: "Qism 3",
-    text: "Citizens should be allowed to carry personal guns.",
-    timeLimit: 120,
-    prepTime: 60,
-    part3Data: {
-      topic: "Citizens should be allowed to carry personal guns.",
-      for: [
-        "Guns can help people protect themselves",
-        "They prevent people from becoming victims of crimes like burglary",
-        "Necessary for hunting or target sports",
-      ],
-      against: [
-        "Guns are weapons that are used to commit a crime",
-        "Fewer guns will reduce the murder rate",
-        "Small or military guns are not useful for activities like hunting",
-      ],
-    },
-  },
-];
+// Mock tests are imported from ./mockTests
 
 type PracticeSet = {
   id: string;
@@ -305,6 +198,9 @@ const LessonLabAssistant: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
+  // Mock test selection
+  const [selectedMockTest, setSelectedMockTest] = useState<MockTestSet | null>(null);
+
   // Practice mode states
   const [practiceTab, setPracticeTab] = useState<string>("Qism 1.1");
   const [practiceSelectedSet, setPracticeSelectedSet] = useState<PracticeSet | null>(null);
@@ -383,6 +279,9 @@ const LessonLabAssistant: React.FC = () => {
     return stream;
   };
 
+  // Active mock test questions (fallback to first test)
+  const activeMockQuestions = selectedMockTest?.questions ?? MOCK_TESTS[0].questions;
+
   // Pre-request mic permission when user enters mock or practice mode
   useEffect(() => {
     if (examMode === "mock_running" || examMode === "practice") {
@@ -438,7 +337,7 @@ const LessonLabAssistant: React.FC = () => {
   // localforage saves are fire-and-forget to prevent blocking question advance.
   const handleMockRecordingStop = (blob: Blob) => {
     const qIdx = currentQuestionIndex;
-    const currentQ = MOCK_TEST_1[qIdx];
+    const currentQ = activeMockQuestions[qIdx];
     const audioUrl = URL.createObjectURL(blob);
 
     // Fire-and-forget: save to localforage in background
@@ -471,10 +370,10 @@ const LessonLabAssistant: React.FC = () => {
     });
 
     // ADVANCE TO NEXT QUESTION — all synchronous, no awaits, no timeouts
-    const isLastQuestion = qIdx === MOCK_TEST_1.length - 1;
+    const isLastQuestion = qIdx === activeMockQuestions.length - 1;
 
     if (!isLastQuestion) {
-      const nextQ = MOCK_TEST_1[qIdx + 1];
+      const nextQ = activeMockQuestions[qIdx + 1];
 
       // Reset recording state for next question
       setUserAudioUrl(null);
@@ -546,7 +445,7 @@ const LessonLabAssistant: React.FC = () => {
     const raf = requestAnimationFrame(() => {
       setPendingNextQuestion(false);
       setTransitionKey(prev => prev + 1); // trigger transition animation
-      const currentQ = MOCK_TEST_1[currentQuestionIndex];
+      const currentQ = activeMockQuestions[currentQuestionIndex];
       if (currentQ.prepTime) {
         setIsPrepTime(true);
         setPrepTimeLeft(currentQ.prepTime);
@@ -618,7 +517,7 @@ const LessonLabAssistant: React.FC = () => {
       // Set initial time based on current question
       let initialTime = 30; // default Qism 1.1
       if (examMode === "mock_running") {
-        initialTime = MOCK_TEST_1[currentQuestionIndex].timeLimit;
+        initialTime = activeMockQuestions[currentQuestionIndex].timeLimit;
       } else if (practiceSelectedSet) {
         initialTime = practiceSelectedSet.questions[practiceQIndex].timeLimit;
       }
@@ -943,7 +842,7 @@ AGAINST3: [argument against]`,
   };
 
   const startPrepOrLive = () => {
-    const currentQ = MOCK_TEST_1[currentQuestionIndex];
+    const currentQ = activeMockQuestions[currentQuestionIndex];
     if (examMode === "mock_running" && currentQ.prepTime && !isPrepTime) {
       setIsPrepTime(true);
       setPrepTimeLeft(currentQ.prepTime);
@@ -953,7 +852,7 @@ AGAINST3: [argument against]`,
   };
 
   const handleReviewNext = () => {
-    if (currentQuestionIndex < MOCK_TEST_1.length - 1) {
+    if (currentQuestionIndex < activeMockQuestions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
       setExamMode("mock_running");
     } else {
@@ -1042,13 +941,8 @@ AGAINST3: [argument against]`,
                 stopLiveSession();
                 setIsPrepTime(false);
                 setPrepTimeLeft(null);
-                setMockSessionId(Date.now().toString());
-                setCurrentQuestionIndex(0);
-                setMockAnswers([]);
-                setExamMode("mock_running");
-                setIsBreakTime(false);
-                setBreakTimeLeft(null);
-                setIsContinuousMockRunning(false);
+                setExamMode("mock_setup");
+                setSelectedMockTest(null);
               }}
               className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${examMode !== "practice" ? "bg-indigo-100 text-indigo-700" : "text-gray-500 hover:bg-gray-100"}`}
             >
@@ -1093,13 +987,8 @@ AGAINST3: [argument against]`,
               stopLiveSession();
               setIsPrepTime(false);
               setPrepTimeLeft(null);
-              setMockSessionId(Date.now().toString());
-              setCurrentQuestionIndex(0);
-              setMockAnswers([]);
-              setExamMode("mock_running");
-              setIsBreakTime(false);
-              setBreakTimeLeft(null);
-              setIsContinuousMockRunning(false);
+              setExamMode("mock_setup");
+              setSelectedMockTest(null);
             }}
             className={`flex-1 py-2.5 text-center text-sm font-bold transition-colors ${examMode !== "practice" ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50" : "text-gray-500"}`}
           >
@@ -1447,24 +1336,94 @@ AGAINST3: [argument against]`,
         </main>
       )}
 
+      {examMode === "mock_setup" && (
+        <main className="max-w-5xl mx-auto px-6 mt-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-[#1E293B] mb-1">Mock Exam</h1>
+            <p className="text-gray-500 text-sm">To'liq imtihon formatida mashq qiling. Har bir test 4 qismdan iborat.</p>
+          </div>
+
+          {/* Test info badges */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5">
+              <Clock size={14} /> ~12 daqiqa
+            </div>
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-xs font-bold">
+              Part 1.1 → Part 3
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg text-xs font-bold">
+              8 ta savol
+            </div>
+          </div>
+
+          {/* Mock test cards grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {MOCK_TESTS.map((test, idx) => {
+              const part11Count = test.questions.filter(q => q.part === "Qism 1.1").length;
+              const part12Count = test.questions.filter(q => q.part === "Qism 1.2").length;
+              const part2Count = test.questions.filter(q => q.part === "Qism 2").length;
+              const part3Count = test.questions.filter(q => q.part === "Qism 3").length;
+              return (
+                <button
+                  key={test.id}
+                  onClick={() => {
+                    setSelectedMockTest(test);
+                    setMockSessionId(Date.now().toString());
+                    setCurrentQuestionIndex(0);
+                    setMockAnswers([]);
+                    setIsBreakTime(false);
+                    setBreakTimeLeft(null);
+                    setIsContinuousMockRunning(false);
+                    setExamMode("mock_running");
+                  }}
+                  className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-indigo-400 hover:shadow-md transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-bold text-lg shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#1E293B] group-hover:text-indigo-600 transition-colors">{test.title}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">{test.description}</p>
+                      </div>
+                    </div>
+                    <ArrowRight size={18} className="text-gray-300 group-hover:text-indigo-500 transition-colors mt-1 shrink-0" />
+                  </div>
+                  {/* Part breakdown */}
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full font-bold">1.1 × {part11Count}</span>
+                    <span className="text-[10px] bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-bold">1.2 × {part12Count}</span>
+                    <span className="text-[10px] bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full font-bold">P2 × {part2Count}</span>
+                    <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold">P3 × {part3Count}</span>
+                  </div>
+                  {/* First question preview */}
+                  <p className="text-xs text-gray-400 mt-3 line-clamp-1 italic">"{test.questions[0].text}"</p>
+                </button>
+              );
+            })}
+          </div>
+        </main>
+      )}
+
       {examMode === "mock_running" && (
         <main className="max-w-5xl mx-auto px-6 mt-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
               <div className="font-bold text-[#1E293B] uppercase">
-                {MOCK_TEST_1[currentQuestionIndex].part}
+                {activeMockQuestions[currentQuestionIndex].part}
                 <span className="text-xs text-gray-400 ml-2 normal-case">
-                  ({MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.1" ? "A1-A2" :
-                    MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.2" ? "B1" :
-                    MOCK_TEST_1[currentQuestionIndex].part === "Qism 2" ? "B2" : "C1"})
+                  ({activeMockQuestions[currentQuestionIndex].part === "Qism 1.1" ? "A1-A2" :
+                    activeMockQuestions[currentQuestionIndex].part === "Qism 1.2" ? "B1" :
+                    activeMockQuestions[currentQuestionIndex].part === "Qism 2" ? "B2" : "C1"})
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm font-bold text-indigo-600">
-                  Savol {currentQuestionIndex + 1} / {MOCK_TEST_1.length}
+                  Savol {currentQuestionIndex + 1} / {activeMockQuestions.length}
                 </div>
                 <div className="flex gap-1">
-                  {MOCK_TEST_1.map((_, i) => (
+                  {activeMockQuestions.map((_, i) => (
                     <div
                       key={i}
                       className={`w-2 h-2 rounded-full ${
@@ -1507,15 +1466,15 @@ AGAINST3: [argument against]`,
                   className="text-center py-8 max-w-3xl mx-auto">
                   <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-bold mb-6">
                     <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
-                    {MOCK_TEST_1[currentQuestionIndex].part}
+                    {activeMockQuestions[currentQuestionIndex].part}
                   </div>
                   <h2 className="text-2xl font-bold text-[#1E293B] mb-6">
-                    {MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.1" ? "Part 1.1" :
-                     MOCK_TEST_1[currentQuestionIndex].part === "Qism 1.2" ? "Part 1.2" :
-                     MOCK_TEST_1[currentQuestionIndex].part === "Qism 2" ? "Part 2" : "Part 3"}
+                    {activeMockQuestions[currentQuestionIndex].part === "Qism 1.1" ? "Part 1.1" :
+                     activeMockQuestions[currentQuestionIndex].part === "Qism 1.2" ? "Part 1.2" :
+                     activeMockQuestions[currentQuestionIndex].part === "Qism 2" ? "Part 2" : "Part 3"}
                   </h2>
                   <p className="text-gray-600 italic text-base leading-relaxed mb-8 text-left">
-                    {PART_INTROS[MOCK_TEST_1[currentQuestionIndex].part]}
+                    {PART_INTROS[activeMockQuestions[currentQuestionIndex].part]}
                   </p>
                   <div className="text-5xl font-bold text-indigo-600 mb-4">
                     {breakTimeLeft}
@@ -1536,23 +1495,23 @@ AGAINST3: [argument against]`,
                   transition={{ duration: 0.35, ease: "easeOut" }}
                   className="flex flex-col items-center w-full"
                 >
-                  {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
+                  {activeMockQuestions[currentQuestionIndex].imageUrls && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
-                      {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
+                      {activeMockQuestions[currentQuestionIndex].imageUrls?.map((url, index) => (
                         <ExamImage key={`${url}-${index}`} src={url} alt={`Exam prompt ${index + 1}`} className="h-64 shadow-md" />
                       ))}
                     </div>
                   )}
 
                   <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-6 text-center max-w-3xl whitespace-pre-line">
-                    {MOCK_TEST_1[currentQuestionIndex].text}
+                    {activeMockQuestions[currentQuestionIndex].text}
                   </div>
 
                   {/* Sub-questions for Qism 2 */}
-                  {MOCK_TEST_1[currentQuestionIndex].subQuestions && (
+                  {activeMockQuestions[currentQuestionIndex].subQuestions && (
                     <div className="w-full max-w-3xl mb-12">
                       <ul className="space-y-4 text-left">
-                        {MOCK_TEST_1[currentQuestionIndex].subQuestions?.map((q, i) => (
+                        {activeMockQuestions[currentQuestionIndex].subQuestions?.map((q, i) => (
                           <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
                             <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
                             <span>{q}</span>
@@ -1562,12 +1521,12 @@ AGAINST3: [argument against]`,
                     </div>
                   )}
 
-                  {MOCK_TEST_1[currentQuestionIndex].part3Data && (
+                  {activeMockQuestions[currentQuestionIndex].part3Data && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
                       <div className="bg-green-50 p-6 rounded-xl border border-green-200">
                         <h4 className="font-bold text-green-800 mb-3">FOR</h4>
                         <ul className="list-disc pl-5 space-y-2 text-green-900">
-                          {MOCK_TEST_1[currentQuestionIndex].part3Data?.for.map(
+                          {activeMockQuestions[currentQuestionIndex].part3Data?.for.map(
                             (point, i) => (
                               <li key={i}>{point}</li>
                             ),
@@ -1577,7 +1536,7 @@ AGAINST3: [argument against]`,
                       <div className="bg-red-50 p-6 rounded-xl border border-red-200">
                         <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
                         <ul className="list-disc pl-5 space-y-2 text-red-900">
-                          {MOCK_TEST_1[currentQuestionIndex].part3Data?.against.map(
+                          {activeMockQuestions[currentQuestionIndex].part3Data?.against.map(
                             (point, i) => (
                               <li key={i}>{point}</li>
                             ),
@@ -1604,7 +1563,7 @@ AGAINST3: [argument against]`,
                       >
                         <AlertTriangle size={22} className="text-amber-500 shrink-0" />
                         <div className="text-sm font-bold text-amber-800">
-                          {!MOCK_TEST_1[currentQuestionIndex].prepTime ? "Savolni o'qing" : "Tayyorlanish"}
+                          {!activeMockQuestions[currentQuestionIndex].prepTime ? "Savolni o'qing" : "Tayyorlanish"}
                         </div>
                         <div className="font-bold text-2xl text-amber-600 animate-pulse tabular-nums min-w-[3ch] text-center">
                           {prepTimeLeft}s
@@ -1638,7 +1597,7 @@ AGAINST3: [argument against]`,
                         }`}>
                           {isLive && timeLeft !== null
                             ? `${timeLeft}s`
-                            : `${MOCK_TEST_1[currentQuestionIndex].timeLimit}s`}
+                            : `${activeMockQuestions[currentQuestionIndex].timeLimit}s`}
                         </div>
                       </motion.div>
                     )}
@@ -1736,7 +1695,7 @@ AGAINST3: [argument against]`,
             <div className="space-y-8">
               {mockAnswers.map((answer, idx) => {
                 if (!answer) return null;
-                const q = MOCK_TEST_1[idx];
+                const q = activeMockQuestions[idx];
                 // Filter logic
                 if (examMode === "mock_review") {
                   if (
@@ -1746,7 +1705,7 @@ AGAINST3: [argument against]`,
                     return null;
                   if (
                     analysisPreference === "each_part" &&
-                    q.part !== MOCK_TEST_1[currentQuestionIndex].part
+                    q.part !== activeMockQuestions[currentQuestionIndex].part
                   )
                     return null;
                 }
@@ -1807,7 +1766,7 @@ AGAINST3: [argument against]`,
                   onClick={handleReviewNext}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg"
                 >
-                  {currentQuestionIndex < MOCK_TEST_1.length - 1
+                  {currentQuestionIndex < activeMockQuestions.length - 1
                     ? analysisPreference === "each_part"
                       ? "Keyingi Bosqich"
                       : "Keyingi Savol"
@@ -1816,15 +1775,8 @@ AGAINST3: [argument against]`,
               ) : (
                 <button
                   onClick={() => {
-                    setMockSessionId(Date.now().toString());
-                    setCurrentQuestionIndex(0);
-                    setMockAnswers([]);
-                    setExamMode("mock_running");
-                    setIsBreakTime(false);
-                    setBreakTimeLeft(null);
-                    setIsPrepTime(false);
-                    setPrepTimeLeft(null);
-                    setIsContinuousMockRunning(false);
+                    setSelectedMockTest(null);
+                    setExamMode("mock_setup");
                   }}
                   className="bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-full font-bold text-lg transition-colors shadow-lg flex items-center gap-2"
                 >
