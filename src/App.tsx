@@ -356,6 +356,47 @@ const LessonLabAssistant: React.FC = () => {
   const chunksRef = useRef<Blob[]>([]);
   const pendingAnalysisRef = useRef(false);
 
+  // Persistent microphone stream — requested ONCE, reused for all recordings
+  const persistentStreamRef = useRef<MediaStream | null>(null);
+  const [micPermissionGranted, setMicPermissionGranted] = useState(false);
+  // Track question transitions for smooth animation
+  const [transitionKey, setTransitionKey] = useState(0);
+
+  // Request microphone permission ONCE on first interaction, reuse forever
+  const ensureMicPermission = async (): Promise<MediaStream> => {
+    if (persistentStreamRef.current) {
+      // Check if tracks are still alive
+      const tracks = persistentStreamRef.current.getAudioTracks();
+      if (tracks.length > 0 && tracks[0].readyState === "live") {
+        return persistentStreamRef.current;
+      }
+    }
+    // Request new stream
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    persistentStreamRef.current = stream;
+    setMicPermissionGranted(true);
+    return stream;
+  };
+
+  // Pre-request mic permission when user enters mock or practice mode
+  useEffect(() => {
+    if (examMode === "mock_running" || examMode === "practice") {
+      ensureMicPermission().catch(err => {
+        console.warn("Mic permission not granted yet:", err);
+      });
+    }
+  }, [examMode]);
+
+  // Cleanup persistent stream on unmount only
+  useEffect(() => {
+    return () => {
+      if (persistentStreamRef.current) {
+        persistentStreamRef.current.getTracks().forEach(t => t.stop());
+        persistentStreamRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -426,13 +467,16 @@ const LessonLabAssistant: React.FC = () => {
 
     if (!isLastQuestion) {
       const nextQ = MOCK_TEST_1[currentQuestionIndex + 1];
+      // Advance index first, then schedule the next action after a tick
+      setCurrentQuestionIndex((prev) => prev + 1);
+      setTransitionKey(prev => prev + 1);
       if (nextQ.part !== currentQ.part) {
+        // Different part — show break/intro screen
         setIsBreakTime(true);
         setBreakTimeLeft(10);
-        setCurrentQuestionIndex((prev) => prev + 1);
       } else {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setPendingNextQuestion(true);
+        // Same part — go to next question with short delay for state to settle
+        setTimeout(() => setPendingNextQuestion(true), 50);
       }
     } else {
       setExamMode("mock_finished");
@@ -480,18 +524,24 @@ const LessonLabAssistant: React.FC = () => {
   }, [isBreakTime, breakTimeLeft]);
 
   // 2) PENDING NEXT QUESTION → start prep time
+  // Uses a small delay to ensure currentQuestionIndex has settled after setState batching
   useEffect(() => {
     if (!pendingNextQuestion || isBreakTime) return;
-    setPendingNextQuestion(false);
-    const currentQ = MOCK_TEST_1[currentQuestionIndex];
-    if (currentQ.prepTime) {
-      setIsPrepTime(true);
-      setPrepTimeLeft(currentQ.prepTime);
-    } else {
-      // Part 1.1 va 1.2: 5 soniya savolni o'qish vaqti
-      setIsPrepTime(true);
-      setPrepTimeLeft(5);
-    }
+    // Use requestAnimationFrame to ensure state has settled
+    const raf = requestAnimationFrame(() => {
+      setPendingNextQuestion(false);
+      setTransitionKey(prev => prev + 1); // trigger transition animation
+      const currentQ = MOCK_TEST_1[currentQuestionIndex];
+      if (currentQ.prepTime) {
+        setIsPrepTime(true);
+        setPrepTimeLeft(currentQ.prepTime);
+      } else {
+        // Part 1.1 va 1.2: 5 soniya savolni o'qish vaqti
+        setIsPrepTime(true);
+        setPrepTimeLeft(5);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [currentQuestionIndex, pendingNextQuestion, isBreakTime]);
 
   // 3) PREP TIME countdown
@@ -521,10 +571,15 @@ const LessonLabAssistant: React.FC = () => {
     return () => clearInterval(timer);
   }, [isLive]);
 
-  // 4b) Recording time expiry → auto-stop
+  // 4b) Recording time expiry → auto-stop (with guard to prevent double-fire)
+  const autoStopFiredRef = useRef(false);
   useEffect(() => {
-    if (isLive && timeLeft !== null && timeLeft <= 0) {
+    if (isLive && timeLeft !== null && timeLeft <= 0 && !autoStopFiredRef.current) {
+      autoStopFiredRef.current = true;
       stopLiveSessionRef.current(true);
+    }
+    if (!isLive) {
+      autoStopFiredRef.current = false;
     }
   }, [isLive, timeLeft]);
 
@@ -542,7 +597,7 @@ const LessonLabAssistant: React.FC = () => {
   };
 
   const startLiveSession = async (isTutorMode: boolean = false) => {
-    if (isStartingLive) return;
+    if (isStartingLive || isLive) return;
     setIsStartingLive(true);
     try {
       // Set initial time based on current question
@@ -554,10 +609,11 @@ const LessonLabAssistant: React.FC = () => {
       }
       setTimeLeft(initialTime);
 
+      // Reuse persistent stream — no new permission prompt
+      const stream = await ensureMicPermission();
+
       const ctx = new AudioContext({ sampleRate: 16000 });
       setAudioContext(ctx);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       // Setup Analyser for real visualizer
       const analyserNode = ctx.createAnalyser();
@@ -709,16 +765,16 @@ const LessonLabAssistant: React.FC = () => {
 
   const stopLiveSession = async (analyzeAfter = false) => {
     pendingAnalysisRef.current = analyzeAfter;
-    
+
     let onStopWillFire = false;
-    
-    // Stop recording immediately to ensure onstop fires
+
+    // Stop recording — but do NOT stop the persistent stream tracks
     if (mediaRecorderRef.current) {
       if (mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
         onStopWillFire = true;
       }
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      // Don't stop stream tracks! We reuse the persistent stream.
     }
     
     // If we are supposed to analyze/advance, but onstop won't fire,
@@ -1421,7 +1477,13 @@ AGAINST3: [argument against]`,
               </div>
 
               {isBreakTime ? (
-                <div className="text-center py-8 max-w-3xl mx-auto">
+                <motion.div
+                  key={`break-${currentQuestionIndex}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.4 }}
+                  className="text-center py-8 max-w-3xl mx-auto">
                   <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-bold mb-6">
                     <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
                     {MOCK_TEST_1[currentQuestionIndex].part}
@@ -1444,9 +1506,15 @@ AGAINST3: [argument against]`,
                   >
                     O'tkazib yuborish →
                   </button>
-                </div>
+                </motion.div>
               ) : (
-                <>
+                <motion.div
+                  key={`q-${transitionKey}`}
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="flex flex-col items-center w-full"
+                >
                   {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
                       {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
@@ -1503,7 +1571,7 @@ AGAINST3: [argument against]`,
                       </div>
                     </div>
                   )}
-                </>
+                </motion.div>
               )}
 
               {!isBreakTime && (
