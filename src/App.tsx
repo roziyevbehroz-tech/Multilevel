@@ -666,7 +666,9 @@ const LessonLabAssistant: React.FC = () => {
       setIsStartingLive(false);
 
       // Setup AudioWorklet + Gemini Live connection (non-blocking)
-      // If this fails, recording still works — just no AI feedback in real-time
+      // SKIP for mock mode — mock only needs local recording, no AI audio feedback
+      // Only connect for practice/tutor mode where real-time AI interaction is needed
+      if (examMode !== "mock_running") {
       try {
         await ctx.audioWorklet.addModule(
           URL.createObjectURL(
@@ -765,6 +767,7 @@ const LessonLabAssistant: React.FC = () => {
         console.warn("AI Live connection failed, recording continues locally:", aiErr);
         // Recording is still working — just no real-time AI
       }
+      } // end if (examMode !== "mock_running")
     } catch (err) {
       console.error("Live Session Error:", err);
       setIsStartingLive(false);
