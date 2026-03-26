@@ -276,11 +276,15 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
           console.error("Error parsing progress:", e);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Audio analysis error:", err);
+      const errorMsg = err?.message || String(err);
+      const isQuota = errorMsg.includes("quota") || errorMsg.includes("kvota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429");
       setMessages(prev => [...prev, {
         role: "model",
-        text: "Kechirasiz, tahlil qilishda xatolik yuz berdi. Bu audio fayl bilan muammo bo'lishi mumkin. Qayta yozdirib ko'ring yoki keyinroq urinib ko'ring."
+        text: isQuota
+          ? "⚠️ **API kvota limiti tugagan.** Gemini API bepul rejimining kunlik/daqiqalik limiti oshib ketgan. Iltimos 1-2 daqiqa kutib qayta urinib ko'ring yoki API kalitingizni yangilang."
+          : `Kechirasiz, tahlil qilishda xatolik yuz berdi:\n\n\`${errorMsg}\`\n\nQayta yozdirib ko'ring yoki keyinroq urinib ko'ring.`
       }]);
     } finally {
       setIsTyping(false);

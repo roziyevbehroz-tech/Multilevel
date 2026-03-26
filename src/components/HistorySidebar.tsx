@@ -116,9 +116,13 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
       
       // Reload to reflect changes
       loadSavedAnswers();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Analysis error:", err);
-      alert("Tahlil qilishda xatolik yuz berdi.");
+      const errorMsg = err?.message || String(err);
+      const isQuota = errorMsg.includes("quota") || errorMsg.includes("kvota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429");
+      alert(isQuota
+        ? "API kvota limiti tugagan. Iltimos 1-2 daqiqa kutib qayta urinib ko'ring."
+        : `Tahlil qilishda xatolik: ${errorMsg}`);
     } finally {
       setIsAnalyzing(false);
     }
