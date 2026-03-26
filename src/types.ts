@@ -58,6 +58,24 @@ export interface AnalysisPreferences {
   fluency: boolean;
 }
 
+export type MockQuestion = {
+  id: string;
+  part: string;
+  text: string;
+  timeLimit: number;
+  prepTime?: number;
+  imageUrls?: string[];
+  subQuestions?: string[];
+  part3Data?: { topic: string; for: string[]; against: string[] };
+};
+
+export type MockTestSet = {
+  id: string;
+  title: string;
+  description: string;
+  questions: MockQuestion[];
+};
+
 export interface ExamState {
   stage: ExamStage;
   level: CEFRLevel;
