@@ -1255,13 +1255,7 @@ AGAINST3: [argument against]`,
                     {currentQ.imageUrls && (
                       <div className={`grid gap-4 mb-6 w-full max-w-2xl ${currentQ.imageUrls.length === 1 ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
                         {currentQ.imageUrls.map((url, index) => (
-                          <img
-                            key={index}
-                            src={url}
-                            alt={`Practice ${index + 1}`}
-                            className="w-full rounded-lg shadow-md object-cover h-64"
-                            referrerPolicy="no-referrer"
-                          />
+                          <ExamImage key={`${url}-${index}`} src={url} alt={`Practice ${index + 1}`} className="h-64 shadow-md" />
                         ))}
                       </div>
                     )}
@@ -1493,6 +1487,24 @@ AGAINST3: [argument against]`,
                     />
                   ))}
                 </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Examni tugatmoqchimisiz? Barcha javoblaringiz saqlanadi.")) {
+                      isSwitchingModeRef.current = true;
+                      stopLiveSession();
+                      setIsPrepTime(false);
+                      setPrepTimeLeft(null);
+                      setIsBreakTime(false);
+                      setBreakTimeLeft(null);
+                      setExamMode("mock_finished");
+                      setIsContinuousMockRunning(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
+                >
+                  <LogOut size={14} />
+                  Tugatish
+                </button>
               </div>
             </div>
             <div className="h-1 w-full bg-[#E87722]"></div>
@@ -1547,13 +1559,7 @@ AGAINST3: [argument against]`,
                   {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
                       {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
-                        <img
-                          key={index}
-                          src={url}
-                          alt={`Exam prompt ${index + 1}`}
-                          className="w-full rounded-lg shadow-md object-cover h-64"
-                          referrerPolicy="no-referrer"
-                        />
+                        <ExamImage key={`${url}-${index}`} src={url} alt={`Exam prompt ${index + 1}`} className="h-64 shadow-md" />
                       ))}
                     </div>
                   )}
@@ -1604,114 +1610,133 @@ AGAINST3: [argument against]`,
               )}
 
               {!isBreakTime && (
-                <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-8 items-end">
-                  {/* Think Time */}
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <AlertTriangle size={32} className="text-[#1E293B]" />
-                    <div className="text-[#1E293B] font-bold">
-                      {isPrepTime && !MOCK_TEST_1[currentQuestionIndex].prepTime ? "Savolni o'qing" : "O'ylash uchun"}
-                    </div>
-                    <div
-                      className={`font-bold text-xl ${isPrepTime ? "text-amber-600 animate-pulse" : "text-[#1E73BE]"}`}
-                    >
-                      {isPrepTime
-                        ? `${prepTimeLeft} soniya`
-                        : MOCK_TEST_1[currentQuestionIndex].prepTime
-                          ? `${MOCK_TEST_1[currentQuestionIndex].prepTime} soniya`
-                          : "5 soniya"}
-                    </div>
-                  </div>
+                <div className="flex flex-col items-center w-full gap-5">
+                  {/* Unified Timer — switches between prep and recording with animation */}
+                  <AnimatePresence mode="wait">
+                    {isPrepTime ? (
+                      <motion.div
+                        key="prep-timer"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.25 }}
+                        className="flex items-center gap-3 bg-amber-50 border border-amber-200 px-5 py-3 rounded-2xl"
+                      >
+                        <AlertTriangle size={22} className="text-amber-500 shrink-0" />
+                        <div className="text-sm font-bold text-amber-800">
+                          {!MOCK_TEST_1[currentQuestionIndex].prepTime ? "Savolni o'qing" : "Tayyorlanish"}
+                        </div>
+                        <div className="font-bold text-2xl text-amber-600 animate-pulse tabular-nums min-w-[3ch] text-center">
+                          {prepTimeLeft}s
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="speak-timer"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.25 }}
+                        className={`flex items-center gap-3 px-5 py-3 rounded-2xl border ${
+                          isLive && timeLeft !== null && timeLeft <= 5
+                            ? "bg-red-50 border-red-200"
+                            : "bg-indigo-50 border-indigo-200"
+                        }`}
+                      >
+                        <Clock size={22} className={`shrink-0 ${
+                          isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-500" : "text-indigo-500"
+                        }`} />
+                        <div className={`text-sm font-bold ${
+                          isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-800" : "text-indigo-800"
+                        }`}>
+                          Qolgan vaqt
+                        </div>
+                        <div className={`font-bold text-2xl tabular-nums min-w-[3ch] text-center ${
+                          isLive && timeLeft !== null && timeLeft <= 5
+                            ? "text-red-600 animate-pulse"
+                            : "text-[#1E73BE]"
+                        }`}>
+                          {isLive && timeLeft !== null
+                            ? `${timeLeft}s`
+                            : `${MOCK_TEST_1[currentQuestionIndex].timeLimit}s`}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  {/* Visualizer & Record Button */}
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="flex items-end gap-1 h-24 justify-center w-full">
-                      {isLive
-                        ? Array.from(visualizerData)
-                            .slice(0, 24)
-                            .map((value, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  height: `${Math.max(10, (value / 255) * 100)}%`,
-                                }}
-                                className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
-                              />
-                            ))
-                        : Array.from({ length: 24 }).map((_, i) => (
+                  {/* Visualizer */}
+                  <div className="flex items-end gap-1 h-16 justify-center w-full max-w-md">
+                    {isLive
+                      ? Array.from(visualizerData)
+                          .slice(0, 24)
+                          .map((value, i) => (
                             <div
                               key={i}
-                              className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
+                              style={{
+                                height: `${Math.max(10, (value / 255) * 100)}%`,
+                              }}
+                              className="w-2 md:w-3 bg-[#1E73BE] rounded-t-sm transition-all duration-75"
                             />
-                          ))}
-                    </div>
-
-                    {!isContinuousMockRunning ? (
-                      <button
-                        onClick={() => {
-                          setIsContinuousMockRunning(true);
-                          // Show part intro before first question
-                          setIsBreakTime(true);
-                          setBreakTimeLeft(8);
-                        }}
-                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
-                      >
-                        <Mic size={20} />
-                        IMTIHONNI BOSHLASH
-                      </button>
-                    ) : isStartingLive ? (
-                      <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
-                        <Loader2 size={20} className="animate-spin" />
-                        ULANMOQDA...
-                      </div>
-                    ) : isPrepTime || isBreakTime ? (
-                      <button
-                        onClick={() => {
-                          if (isBreakTime) {
-                            setBreakTimeLeft(0);
-                          } else if (isPrepTime) {
-                            setIsPrepTime(false);
-                            setPrepTimeLeft(null);
-                            startLiveSession();
-                          }
-                        }}
-                        className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
-                      >
-                        <ArrowRight size={20} />
-                        {isBreakTime ? "BOSHLASH" : "GAPIRISHNI BOSHLASH"}
-                      </button>
-                    ) : isLive ? (
-                      <button
-                        onClick={() => stopLiveSession(true)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
-                      >
-                        <Square size={20} fill="currentColor" />
-                        YAKUNLASH
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => startLiveSession()}
-                        className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
-                      >
-                        <Mic size={20} />
-                        GAPIRISHNI BOSHLASH
-                      </button>
-                    )}
+                          ))
+                      : Array.from({ length: 24 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-2 md:w-3 bg-gray-200 rounded-t-sm h-4"
+                          />
+                        ))}
                   </div>
 
-                  {/* Speak Time */}
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <Clock size={32} className="text-[#1E293B]" />
-                    <div className="text-[#1E293B] font-bold">
-                      Qolgan vaqt
-                    </div>
-                    <div
-                      className={`font-bold text-xl ${isLive && timeLeft !== null && timeLeft <= 5 ? "text-red-600 animate-pulse" : "text-[#1E73BE]"}`}
+                  {/* Action Button */}
+                  {!isContinuousMockRunning ? (
+                    <button
+                      onClick={() => {
+                        setIsContinuousMockRunning(true);
+                        setIsBreakTime(true);
+                        setBreakTimeLeft(8);
+                      }}
+                      className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
                     >
-                      {isLive && timeLeft !== null
-                        ? `${timeLeft} soniya`
-                        : `${MOCK_TEST_1[currentQuestionIndex].timeLimit} soniya`}
+                      <Mic size={20} />
+                      IMTIHONNI BOSHLASH
+                    </button>
+                  ) : isStartingLive ? (
+                    <div className="bg-blue-100 text-blue-800 px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg">
+                      <Loader2 size={20} className="animate-spin" />
+                      ULANMOQDA...
                     </div>
-                  </div>
+                  ) : isPrepTime || isBreakTime ? (
+                    <button
+                      onClick={() => {
+                        if (isBreakTime) {
+                          setBreakTimeLeft(0);
+                        } else if (isPrepTime) {
+                          setIsPrepTime(false);
+                          setPrepTimeLeft(null);
+                          startLiveSession();
+                        }
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      <ArrowRight size={20} />
+                      {isBreakTime ? "BOSHLASH" : "GAPIRISHNI BOSHLASH"}
+                    </button>
+                  ) : isLive ? (
+                    <button
+                      onClick={() => stopLiveSession(true)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg animate-pulse"
+                    >
+                      <Square size={20} fill="currentColor" />
+                      YAKUNLASH
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startLiveSession()}
+                      className="bg-[#1E73BE] hover:bg-blue-800 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      <Mic size={20} />
+                      GAPIRISHNI BOSHLASH
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1846,3 +1871,60 @@ AGAINST3: [argument against]`,
 export default function App() {
   return <LessonLabAssistant />;
 }
+
+// Reliable image component with retry, loading state, and fallback
+const ExamImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  // Add cache-buster on retry to bypass cached failed response
+  const imgSrc = retryCount > 0 ? `${src}${src.includes("?") ? "&" : "?"}retry=${retryCount}` : src;
+
+  useEffect(() => {
+    setStatus("loading");
+    setRetryCount(0);
+  }, [src]);
+
+  return (
+    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className || "h-64"}`}>
+      {status === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <Loader2 size={28} className="animate-spin text-gray-400" />
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-500 gap-2 p-4">
+          <AlertTriangle size={28} />
+          <span className="text-sm text-center">Rasm yuklanmadi</span>
+          {retryCount < maxRetries && (
+            <button
+              onClick={() => { setRetryCount(prev => prev + 1); setStatus("loading"); }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium"
+            >
+              Qayta yuklash
+            </button>
+          )}
+        </div>
+      )}
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"}`}
+        referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
+        onLoad={() => setStatus("loaded")}
+        onError={() => {
+          if (retryCount < maxRetries) {
+            // Auto-retry after a short delay
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+            }, 1000 * (retryCount + 1));
+          } else {
+            setStatus("error");
+          }
+        }}
+      />
+    </div>
+  );
+};
