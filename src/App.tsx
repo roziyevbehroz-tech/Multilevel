@@ -362,6 +362,9 @@ const LessonLabAssistant: React.FC = () => {
   // Track question transitions for smooth animation
   const [transitionKey, setTransitionKey] = useState(0);
 
+  // Ref-based callback for recorder.onstop — always points to latest function
+  const onRecordingStopRef = useRef<(blob: Blob) => void>(() => {});
+
   // Request microphone permission ONCE on first interaction, reuse forever
   const ensureMicPermission = async (): Promise<MediaStream> => {
     if (persistentStreamRef.current) {
@@ -429,32 +432,34 @@ const LessonLabAssistant: React.FC = () => {
     }
   };
 
-  const handleMockRecordingStop = async (blob: Blob) => {
-    const currentQ = MOCK_TEST_1[currentQuestionIndex];
+  // CRITICAL: This function must be SYNCHRONOUS for state updates.
+  // localforage saves are fire-and-forget to prevent blocking question advance.
+  const handleMockRecordingStop = (blob: Blob) => {
+    const qIdx = currentQuestionIndex;
+    const currentQ = MOCK_TEST_1[qIdx];
     const audioUrl = URL.createObjectURL(blob);
 
-    try {
-      const answerId = `answer_${Date.now()}_${currentQ.id}`;
-      await localforage.setItem(answerId, {
-        id: answerId,
-        sessionId: mockSessionId || undefined,
-        questionId: currentQ.id,
-        part: currentQ.part,
-        questionText: currentQ.text,
-        audioUrl,
-        audioBlob: blob,
-        transcript: null,
-        analysis: null,
-        timestamp: Date.now(),
-      });
+    // Fire-and-forget: save to localforage in background
+    const answerId = `answer_${Date.now()}_${currentQ.id}`;
+    localforage.setItem(answerId, {
+      id: answerId,
+      sessionId: mockSessionId || undefined,
+      questionId: currentQ.id,
+      part: currentQ.part,
+      questionText: currentQ.text,
+      audioUrl,
+      audioBlob: blob,
+      transcript: null,
+      analysis: null,
+      timestamp: Date.now(),
+    }).then(() => {
       setHistoryRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      console.error("Error saving mock answer:", err);
-    }
+    }).catch(err => console.error("Error saving mock answer:", err));
 
+    // Update answers array
     setMockAnswers((prev) => {
       const newAnswers = [...prev];
-      newAnswers[currentQuestionIndex] = {
+      newAnswers[qIdx] = {
         questionId: currentQ.id,
         audioUrl,
         analysis: null,
@@ -463,26 +468,34 @@ const LessonLabAssistant: React.FC = () => {
       return newAnswers;
     });
 
-    const isLastQuestion = currentQuestionIndex === MOCK_TEST_1.length - 1;
+    // ADVANCE TO NEXT QUESTION — all synchronous, no awaits, no timeouts
+    const isLastQuestion = qIdx === MOCK_TEST_1.length - 1;
 
     if (!isLastQuestion) {
-      const nextQ = MOCK_TEST_1[currentQuestionIndex + 1];
-      // Advance index first, then schedule the next action after a tick
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setTransitionKey(prev => prev + 1);
+      const nextQ = MOCK_TEST_1[qIdx + 1];
+
+      // Reset recording state for next question
+      setUserAudioUrl(null);
+      setRecordedChunks([]);
+
       if (nextQ.part !== currentQ.part) {
         // Different part — show break/intro screen
+        setCurrentQuestionIndex(qIdx + 1);
+        setTransitionKey(prev => prev + 1);
         setIsBreakTime(true);
         setBreakTimeLeft(10);
       } else {
-        // Same part — go to next question with short delay for state to settle
-        setTimeout(() => setPendingNextQuestion(true), 50);
+        // Same part — advance and immediately start prep countdown
+        setCurrentQuestionIndex(qIdx + 1);
+        setTransitionKey(prev => prev + 1);
+        setIsPrepTime(true);
+        setPrepTimeLeft(nextQ.prepTime || 5);
       }
     } else {
       setExamMode("mock_finished");
       setIsContinuousMockRunning(false);
-      
-      // Create Full Mock Feedback entry
+
+      // Fire-and-forget: save full mock feedback entry
       const fullMockId = `answer_${Date.now()}_full_mock`;
       localforage.setItem(fullMockId, {
         id: fullMockId,
@@ -634,20 +647,16 @@ const LessonLabAssistant: React.FC = () => {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
+      // Use ref-based callback to ALWAYS call the latest functions
+      // This prevents stale closure bugs where old handleMockRecordingStop
+      // captures outdated currentQuestionIndex
       recorder.onstop = () => {
         if (isSwitchingModeRef.current) {
           isSwitchingModeRef.current = false;
           return;
         }
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setUserAudioUrl(URL.createObjectURL(blob));
-        setRecordedChunks([...chunksRef.current]);
-
-        if (examMode === "mock_running") {
-          handleMockRecordingStop(blob);
-        } else if (examMode === "practice") {
-          handlePracticeRecordingStop(blob);
-        }
+        onRecordingStopRef.current(blob);
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
@@ -782,12 +791,7 @@ const LessonLabAssistant: React.FC = () => {
     if (analyzeAfter && !onStopWillFire) {
       const blob = new Blob(chunksRef.current.length > 0 ? chunksRef.current : recordedChunks, { type: "audio/webm" });
       if (blob.size > 0) {
-        setUserAudioUrl(URL.createObjectURL(blob));
-        if (examMode === "mock_running") {
-          handleMockRecordingStop(blob);
-        } else if (examMode === "practice") {
-          handlePracticeRecordingStop(blob);
-        }
+        onRecordingStopRef.current(blob);
       }
     }
     
@@ -814,6 +818,18 @@ const LessonLabAssistant: React.FC = () => {
   // Keep function refs updated every render (avoids stale closures in useEffects)
   useEffect(() => { startLiveSessionRef.current = startLiveSession; });
   useEffect(() => { stopLiveSessionRef.current = stopLiveSession; });
+  // CRITICAL: Update onstop ref every render so recorder.onstop always calls latest functions
+  useEffect(() => {
+    onRecordingStopRef.current = (blob: Blob) => {
+      setUserAudioUrl(URL.createObjectURL(blob));
+      setRecordedChunks([...chunksRef.current]);
+      if (examMode === "mock_running") {
+        handleMockRecordingStop(blob);
+      } else if (examMode === "practice") {
+        handlePracticeRecordingStop(blob);
+      }
+    };
+  });
 
   const generateRandomQuestion = async () => {
     setIsGeneratingQ(true);
