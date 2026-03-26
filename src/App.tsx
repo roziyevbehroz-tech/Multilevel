@@ -1493,6 +1493,24 @@ AGAINST3: [argument against]`,
                     />
                   ))}
                 </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Examni tugatmoqchimisiz? Barcha javoblaringiz saqlanadi.")) {
+                      isSwitchingModeRef.current = true;
+                      stopLiveSession();
+                      setIsPrepTime(false);
+                      setPrepTimeLeft(null);
+                      setIsBreakTime(false);
+                      setBreakTimeLeft(null);
+                      setExamMode("mock_finished");
+                      setIsContinuousMockRunning(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
+                >
+                  <LogOut size={14} />
+                  Tugatish
+                </button>
               </div>
             </div>
             <div className="h-1 w-full bg-[#E87722]"></div>
