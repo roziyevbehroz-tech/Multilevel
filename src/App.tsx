@@ -998,10 +998,10 @@ AGAINST3: [argument against]`,
       {!isAITeacherOpen && (
         <button
           onClick={() => setIsAITeacherOpen(true)}
-          className="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 transition-all hover:scale-105 z-40 flex items-center gap-2 group"
+          className="fixed bottom-6 right-6 bg-indigo-600 text-white px-5 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all hover:scale-105 z-40 flex items-center gap-2"
         >
-          <Bot size={24} />
-          <span className="font-bold hidden group-hover:block pr-2">AI Teacher</span>
+          <Bot size={22} />
+          <span className="font-bold text-sm">AI Yordam</span>
         </button>
       )}
 
@@ -1238,19 +1238,6 @@ AGAINST3: [argument against]`,
 
                   {/* Question Content */}
                   <div className="p-8 md:p-12 flex flex-col items-center">
-                    {/* AI Tutor Discussion Button */}
-                    {isReady && !hasDoneRecording && (
-                      <button
-                        onClick={() => startLiveSession(true)}
-                        className="flex items-center gap-3 mb-6 bg-emerald-50 px-6 py-3 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                      >
-                        <Bot size={24} className="text-emerald-600" />
-                        <span className="text-emerald-900 font-bold text-sm tracking-wide uppercase">
-                          AI TUTOR bilan muhokama
-                        </span>
-                      </button>
-                    )}
-
                     {/* Images */}
                     {currentQ.imageUrls && (
                       <div className={`grid gap-4 mb-6 w-full max-w-2xl ${currentQ.imageUrls.length === 1 ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
@@ -1510,13 +1497,6 @@ AGAINST3: [argument against]`,
             <div className="h-1 w-full bg-[#E87722]"></div>
 
             <div className="p-8 md:p-12 flex flex-col items-center">
-              <div className="flex items-center gap-3 mb-6 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
-                <Bot size={24} className="text-indigo-600" />
-                <span className="text-indigo-900 font-bold text-sm tracking-wide uppercase">
-                  Super AI Examiner
-                </span>
-              </div>
-
               {isBreakTime ? (
                 <motion.div
                   key={`break-${currentQuestionIndex}`}

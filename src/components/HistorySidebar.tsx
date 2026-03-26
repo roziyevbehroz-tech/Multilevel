@@ -133,11 +133,13 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-200 shadow-md p-2 rounded-r-xl transition-all duration-300 ${
+        className={`fixed top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-200 shadow-md px-2 py-3 rounded-r-xl transition-all duration-300 flex flex-col items-center gap-1 ${
           isOpen ? "left-[320px]" : "left-0"
         }`}
       >
-        {isOpen ? <ChevronLeft size={20} className="text-gray-600" /> : <ChevronRight size={20} className="text-gray-600" />}
+        <FileText size={18} className="text-indigo-600" />
+        {!isOpen && <span className="text-[9px] font-bold text-gray-500 writing-mode-vertical" style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>Tarix</span>}
+        {isOpen ? <ChevronLeft size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
       </button>
 
       {/* Sidebar */}
