@@ -1255,13 +1255,7 @@ AGAINST3: [argument against]`,
                     {currentQ.imageUrls && (
                       <div className={`grid gap-4 mb-6 w-full max-w-2xl ${currentQ.imageUrls.length === 1 ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
                         {currentQ.imageUrls.map((url, index) => (
-                          <img
-                            key={index}
-                            src={url}
-                            alt={`Practice ${index + 1}`}
-                            className="w-full rounded-lg shadow-md object-cover h-64"
-                            referrerPolicy="no-referrer"
-                          />
+                          <ExamImage key={`${url}-${index}`} src={url} alt={`Practice ${index + 1}`} className="h-64 shadow-md" />
                         ))}
                       </div>
                     )}
@@ -1565,13 +1559,7 @@ AGAINST3: [argument against]`,
                   {MOCK_TEST_1[currentQuestionIndex].imageUrls && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
                       {MOCK_TEST_1[currentQuestionIndex].imageUrls?.map((url, index) => (
-                        <img
-                          key={index}
-                          src={url}
-                          alt={`Exam prompt ${index + 1}`}
-                          className="w-full rounded-lg shadow-md object-cover h-64"
-                          referrerPolicy="no-referrer"
-                        />
+                        <ExamImage key={`${url}-${index}`} src={url} alt={`Exam prompt ${index + 1}`} className="h-64 shadow-md" />
                       ))}
                     </div>
                   )}
@@ -1864,3 +1852,60 @@ AGAINST3: [argument against]`,
 export default function App() {
   return <LessonLabAssistant />;
 }
+
+// Reliable image component with retry, loading state, and fallback
+const ExamImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  // Add cache-buster on retry to bypass cached failed response
+  const imgSrc = retryCount > 0 ? `${src}${src.includes("?") ? "&" : "?"}retry=${retryCount}` : src;
+
+  useEffect(() => {
+    setStatus("loading");
+    setRetryCount(0);
+  }, [src]);
+
+  return (
+    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className || "h-64"}`}>
+      {status === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <Loader2 size={28} className="animate-spin text-gray-400" />
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-500 gap-2 p-4">
+          <AlertTriangle size={28} />
+          <span className="text-sm text-center">Rasm yuklanmadi</span>
+          {retryCount < maxRetries && (
+            <button
+              onClick={() => { setRetryCount(prev => prev + 1); setStatus("loading"); }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium"
+            >
+              Qayta yuklash
+            </button>
+          )}
+        </div>
+      )}
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"}`}
+        referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
+        onLoad={() => setStatus("loaded")}
+        onError={() => {
+          if (retryCount < maxRetries) {
+            // Auto-retry after a short delay
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+            }, 1000 * (retryCount + 1));
+          } else {
+            setStatus("error");
+          }
+        }}
+      />
+    </div>
+  );
+};
