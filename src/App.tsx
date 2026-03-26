@@ -362,8 +362,10 @@ const LessonLabAssistant: React.FC = () => {
   // Track question transitions for smooth animation
   const [transitionKey, setTransitionKey] = useState(0);
 
-  // Ref-based callback for recorder.onstop — always points to latest function
+  // Ref-based callback for recording stop — always points to latest function
   const onRecordingStopRef = useRef<(blob: Blob) => void>(() => {});
+  // Guard: prevent double-handling of recording stop
+  const recordingHandledRef = useRef(false);
 
   // Request microphone permission ONCE on first interaction, reuse forever
   const ensureMicPermission = async (): Promise<MediaStream> => {
@@ -647,19 +649,26 @@ const LessonLabAssistant: React.FC = () => {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      // Use ref-based callback to ALWAYS call the latest functions
-      // This prevents stale closure bugs where old handleMockRecordingStop
-      // captures outdated currentQuestionIndex
+      // onstop is only a SAFETY NET — primary handling is in stopLiveSession
       recorder.onstop = () => {
         if (isSwitchingModeRef.current) {
           isSwitchingModeRef.current = false;
           return;
         }
+        // Skip if already handled in stopLiveSession (the normal path)
+        if (recordingHandledRef.current) {
+          recordingHandledRef.current = false;
+          return;
+        }
+        // Fallback: onstop fired without stopLiveSession handling it
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         onRecordingStopRef.current(blob);
       };
-      recorder.start();
+      // timeslice=200ms: ensures chunks accumulate regularly so we don't
+      // depend on onstop to get audio data — chunks are available immediately
+      recorder.start(200);
       mediaRecorderRef.current = recorder;
+      recordingHandledRef.current = false;
 
       // Recording is now LIVE — set state immediately (don't wait for WebSocket)
       setIsLive(true);
@@ -778,26 +787,27 @@ const LessonLabAssistant: React.FC = () => {
   const stopLiveSession = async (analyzeAfter = false) => {
     pendingAnalysisRef.current = analyzeAfter;
 
-    let onStopWillFire = false;
-
-    // Stop recording — but do NOT stop the persistent stream tracks
+    // Stop the MediaRecorder
     if (mediaRecorderRef.current) {
       if (mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-        onStopWillFire = true;
+        mediaRecorderRef.current.stop(); // will fire onstop async (but we don't wait)
       }
-      // Don't stop stream tracks! We reuse the persistent stream.
     }
-    
-    // If we are supposed to analyze/advance, but onstop won't fire,
-    // we must manually advance to prevent getting stuck.
-    if (analyzeAfter && !onStopWillFire) {
-      const blob = new Blob(chunksRef.current.length > 0 ? chunksRef.current : recordedChunks, { type: "audio/webm" });
+
+    // CRITICAL: Handle recording result IMMEDIATELY — do NOT wait for onstop.
+    // With timeslice=200ms, chunksRef.current already has all audio data
+    // (may miss last <200ms which is negligible).
+    if (analyzeAfter && !recordingHandledRef.current) {
+      recordingHandledRef.current = true; // prevent onstop from double-handling
+      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
       if (blob.size > 0) {
         onRecordingStopRef.current(blob);
+      } else {
+        // Edge case: no audio data — still advance the question
+        onRecordingStopRef.current(new Blob([], { type: "audio/webm" }));
       }
     }
-    
+
     if (session) {
       try {
         const s = await session;
