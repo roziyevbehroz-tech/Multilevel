@@ -78,21 +78,21 @@ const MOCK_TEST_2: MockTestSet = {
     {
       id: "m2_1.2.1", part: "Qism 1.2", text: "What can you see in these pictures?", timeLimit: 45,
       imageUrls: [
-        "https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1556388158-158ea5ccacbd?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&q=80&w=800",
       ],
     },
     {
       id: "m2_1.2.2", part: "Qism 1.2", text: "What are the advantages of travelling by plane?", timeLimit: 30,
       imageUrls: [
-        "https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1556388158-158ea5ccacbd?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&q=80&w=800",
       ],
     },
     {
       id: "m2_1.2.3", part: "Qism 1.2", text: "Why do some people prefer travelling by train?", timeLimit: 30,
       imageUrls: [
-        "https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1556388158-158ea5ccacbd?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&q=80&w=800",
       ],
     },
