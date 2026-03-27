@@ -242,6 +242,7 @@ const LessonLabAssistant: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingMimeTypeRef = useRef<string>("audio/webm");
   const chunksRef = useRef<Blob[]>([]);
   const pendingAnalysisRef = useRef(false);
 
@@ -529,7 +530,18 @@ const LessonLabAssistant: React.FC = () => {
       setRecordedChunks([]);
       setUserAudioUrl(null);
 
-      const recorder = new MediaRecorder(stream);
+      // Detect supported codec for this device/browser
+      const supportedMime = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+        "audio/mp4",
+        "",
+      ].find(t => !t || MediaRecorder.isTypeSupported(t)) ?? "";
+      recordingMimeTypeRef.current = supportedMime || "audio/webm";
+
+      const recorder = supportedMime ? new MediaRecorder(stream, { mimeType: supportedMime }) : new MediaRecorder(stream);
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
@@ -545,7 +557,7 @@ const LessonLabAssistant: React.FC = () => {
           return;
         }
         // Fallback: onstop fired without stopLiveSession handling it
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || recordingMimeTypeRef.current });
         onRecordingStopRef.current(blob);
       };
       // timeslice=200ms: ensures chunks accumulate regularly so we don't
@@ -683,12 +695,13 @@ const LessonLabAssistant: React.FC = () => {
     // (may miss last <200ms which is negligible).
     if (analyzeAfter && !recordingHandledRef.current) {
       recordingHandledRef.current = true; // prevent onstop from double-handling
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const recMime = mediaRecorderRef.current?.mimeType || recordingMimeTypeRef.current;
+      const blob = new Blob(chunksRef.current, { type: recMime });
       if (blob.size > 0) {
         onRecordingStopRef.current(blob);
       } else {
         // Edge case: no audio data — still advance the question
-        onRecordingStopRef.current(new Blob([], { type: "audio/webm" }));
+        onRecordingStopRef.current(new Blob([], { type: recMime }));
       }
     }
 
