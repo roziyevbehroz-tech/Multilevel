@@ -24,6 +24,14 @@ Sening vazifang:
 3. Foydalanuvchi bilan bemalol fikr almashish, savollariga javob berish
 4. Har bir javobni qayta yozdirib, yangi javobni ham tahlil qilish
 
+⚡ MUHIM: INTELLEKTUAL TAHLIL USTUNI:
+- Agar javob QISQA (1-2 so'z yoki qisqa jumla), O'LMASA SAVOL BILAN BEG'ANI BO'LMASA (masalan: "Salom" yoki "Ha, bugungi havo yaxshi"):
+  → Faqat YENGIL FIKR-MULOHAZA: "Rahmat, bu yaxshi boshlanish. Iltimos, batafsil javob berish uchun uzun gaplar ishlatib ko'ring."
+  → To'liq tahlilni QILMANG — token sarflang.
+
+- Agar javob HAQIQIY VA UZUN (15+ soniya yoki 5+ gaplari):
+  → Quyidagi TO'LIQ FORMATDAN foydalang:
+
 Tahlil qilganda quyidagi formatdan foydalaning:
 
 📝 **Sizning javobingiz (Transcript):**
@@ -266,16 +274,35 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
         reader.onerror = () => reject(new Error("FileReader xatolik"));
       });
 
+      // Smart analysis detection: Check audio duration and content
+      const audioDurationSeconds = audioBlob.size / 32000; // Rough estimate: 32kb per second for 16-bit audio
+      const isVeryShortAudio = audioDurationSeconds < 2; // Less than 2 seconds
+
+      // If audio is very short and not a re-record, ask user to record more
+      if (isVeryShortAudio && !isReRecord) {
+        setMessages(prev => [...prev, {
+          role: "model",
+          text: "Javobingiz juda qisqa bo'ldi 🔊. Iltimos, savolgaga to'liqroq javob bering va qayta yozdiring. Hech bo'lmaganda 10-15 soniyani sarflang, yoki tugmani ustun ushlab iborat javob bering."
+        }]);
+        setIsTyping(false);
+        return;
+      }
+
       let context = EXAMINER_CONTEXT;
       context += `\n\nSavol: "${answer.questionText}" (${answer.part})`;
 
       if (isReRecord) {
         context += `\n\nBu foydalanuvchining QAYTA YOZDIRILGAN javobi. Oldingi javob bilan solishtir va o'sishni ko'rsat. Oldingi tahlil chat tarixida mavjud.`;
-        // Include previous analysis for comparison
         const prevAnalysis = messages.find(m => m.role === "model" && m.text.includes("Natija (Score)"));
         if (prevAnalysis) {
           context += `\n\nOldingi tahlil:\n${prevAnalysis.text.substring(0, 500)}...`;
         }
+      }
+
+      // Add logic for intelligent analysis level
+      if (isVeryShortAudio) {
+        // Short audio but re-recording: do light feedback
+        context += `\n\nBu javob juda qisqa. Iltimos, faqat muhim xatolarni va tavsilarni beradig, chuq tahlilga o'tmasdan.`;
       }
 
       const audioMime = audioBlob.type || "audio/webm";
