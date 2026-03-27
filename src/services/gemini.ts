@@ -232,7 +232,28 @@ export class GeminiService {
 
   // ── CLAUDE TEXT ANALYSIS ───────────────────────────────────────────────
 
-  async generateText(prompt: string): Promise<GenerateContentResponse> {
+  async generateText(prompt: string, onChunk?: (text: string) => void): Promise<GenerateContentResponse> {
+    if (onChunk) {
+      let fullText = "";
+      try {
+        const stream = this.claude.messages.stream({
+          model: this.claudeModel,
+          max_tokens: 1500,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: prompt }],
+        });
+        for await (const event of stream as any) {
+          if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+            fullText += event.delta.text;
+            onChunk(event.delta.text);
+          }
+        }
+        return { text: fullText } as unknown as GenerateContentResponse;
+      } catch (err) {
+        console.warn("Claude streaming failed, falling back:", err);
+      }
+    }
+
     const text = await this.withRetry(async () => {
       const response = await this.claude.messages.create({
         model: this.claudeModel,
@@ -243,11 +264,11 @@ export class GeminiService {
       return (response.content[0] as any).text as string;
     });
 
+    onChunk?.(text);
     return { text } as unknown as GenerateContentResponse;
   }
 
-  async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    // Determine audio format for GPT-4o audio preview
+  async analyzeAudio(audioBase64: string, mimeType: string, context: string, onChunk?: (text: string) => void): Promise<GenerateContentResponse> {
     const format = mimeType.includes("webm") ? "webm"
       : mimeType.includes("mp4") || mimeType.includes("m4a") ? "mp4"
       : mimeType.includes("wav") ? "wav"
@@ -255,8 +276,8 @@ export class GeminiService {
       : "webm";
 
     try {
-      // gpt-4o-mini-audio-preview — faster, hears audio directly for real pronunciation/fluency analysis
-      const response = await (this.openai.chat.completions.create as any)({
+      let fullText = "";
+      const stream = await (this.openai.chat.completions.create as any)({
         model: "gpt-4o-mini-audio-preview",
         modalities: ["text"],
         messages: [
@@ -264,10 +285,7 @@ export class GeminiService {
           {
             role: "user",
             content: [
-              {
-                type: "input_audio",
-                input_audio: { data: audioBase64, format },
-              },
+              { type: "input_audio", input_audio: { data: audioBase64, format } },
               {
                 type: "text",
                 text: `Context: ${context}\n\nListen to my spoken English response carefully. Provide feedback EXACTLY as per the FEEDBACK FORMAT. Focus especially on every grammar mistake.`,
@@ -276,29 +294,29 @@ export class GeminiService {
           },
         ],
         max_tokens: 1500,
+        stream: true,
       });
 
-      const text: string = response.choices[0]?.message?.content ?? "Tahlil qilib bo'lmadi.";
-      return { text } as unknown as GenerateContentResponse;
+      for await (const chunk of stream) {
+        const delta: string = chunk.choices[0]?.delta?.content ?? "";
+        if (delta) {
+          fullText += delta;
+          onChunk?.(delta);
+        }
+      }
+      return { text: fullText } as unknown as GenerateContentResponse;
     } catch (gptErr) {
       console.warn("GPT-4o audio failed, falling back to Whisper + Claude:", gptErr);
 
-      // Fallback: Whisper transcription → Claude analysis
+      // Fallback: Whisper → Claude
       let transcript = "";
       try {
         const byteCharacters = atob(audioBase64);
         const byteArray = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteArray[i] = byteCharacters.charCodeAt(i);
-        }
+        for (let i = 0; i < byteCharacters.length; i++) byteArray[i] = byteCharacters.charCodeAt(i);
         const blob = new Blob([byteArray], { type: mimeType });
         const audioFile = new File([blob], `audio.${format}`, { type: mimeType });
-
-        const transcription = await this.openai.audio.transcriptions.create({
-          file: audioFile,
-          model: "whisper-1",
-          language: "en",
-        });
+        const transcription = await this.openai.audio.transcriptions.create({ file: audioFile, model: "whisper-1", language: "en" });
         transcript = transcription.text;
       } catch (whisperErr) {
         console.warn("Whisper transcription also failed:", whisperErr);
@@ -308,18 +326,36 @@ export class GeminiService {
         ? `Context: ${context}\n\nUser's spoken transcript (transcribed by Whisper):\n"${transcript}"\n\nProvide feedback EXACTLY as per the FEEDBACK FORMAT. Note common Uzbek learner pronunciation issues based on the words used.`
         : `Context: ${context}\n\n(Audio could not be processed. Provide general feedback on how to answer this question well.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
 
-      return this.generateText(prompt);
+      return this.generateText(prompt, onChunk);
     }
   }
 
-  async chat(history: { role: "user" | "model", text: string }[], newMessage: string, context: string): Promise<GenerateContentResponse> {
+  async chat(history: { role: "user" | "model", text: string }[], newMessage: string, context: string, onChunk?: (text: string) => void): Promise<GenerateContentResponse> {
     const messages: Anthropic.MessageParam[] = history.map(msg => ({
       role: msg.role === "model" ? "assistant" as const : "user" as const,
       content: msg.text,
     }));
+    if (newMessage) messages.push({ role: "user", content: newMessage });
 
-    if (newMessage) {
-      messages.push({ role: "user", content: newMessage });
+    if (onChunk) {
+      let fullText = "";
+      try {
+        const stream = this.claude.messages.stream({
+          model: this.claudeModel,
+          max_tokens: 2048,
+          system: context,
+          messages,
+        });
+        for await (const event of stream as any) {
+          if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+            fullText += event.delta.text;
+            onChunk(event.delta.text);
+          }
+        }
+        return { text: fullText } as unknown as GenerateContentResponse;
+      } catch (err) {
+        console.warn("Claude chat streaming failed, falling back:", err);
+      }
     }
 
     const text = await this.withRetry(async () => {
@@ -332,6 +368,7 @@ export class GeminiService {
       return (response.content[0] as any).text as string;
     });
 
+    onChunk?.(text);
     return { text } as unknown as GenerateContentResponse;
   }
 }
