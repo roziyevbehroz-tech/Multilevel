@@ -1,5 +1,6 @@
 import { GoogleGenAI, LiveServerMessage, Modality, GenerateContentResponse } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { Message } from "../types";
 
 const SYSTEM_PROMPT = `You are the "LessonLab Speaking Assistant," an expert English Speaking Examiner for the Uzbekistan Multi-level English Exam (CEFR). Your goal is to evaluate the user's spoken responses (provided as text transcripts) strictly according to the official Multi-level format, timing, and grading rubrics.
@@ -41,7 +42,8 @@ Whenever the user asks for analysis of their answer, you must structure your res
 
 🔍 Tahlil va Maslahatlar (Analysis):
 (Write this section in friendly, encouraging UZBEK. Address the following based on the transcript)
-* Fikrni yetkazish (Fluency & Coherence): Did they answer the question fully? Was it logical?
+* Talaffuz (Pronunciation): Based on the transcript, identify words that are commonly mispronounced by Uzbek speakers. Provide phonetic guidance (IPA or simple phonetic spelling) for 2-3 key words.
+* Fikrni yetkazish (Fluency & Coherence): Did they answer the question fully? Was it logical and well-structured?
 * So'z boyligi (Lexical Resource): Point out weak words they used and suggest 2-3 advanced (C1/C2) alternatives or idioms.
 * Grammatika (Grammar): Point out specific errors from their transcript and provide the corrected version.
 
@@ -74,6 +76,7 @@ Whenever the user asks for analysis of their answer, you must structure your res
 export class GeminiService {
   private ai: GoogleGenAI;
   private claude: Anthropic;
+  private openai: OpenAI;
   private claudeModel: string = "claude-haiku-4-5-20251001";
   private liveModel: string = "gemini-2.0-flash-live-001";
 
@@ -85,13 +88,23 @@ export class GeminiService {
     }
     this.ai = new GoogleGenAI({ apiKey: geminiKey || "" });
 
-    // Claude — for text analysis, chat, audio analysis
+    // Claude — for text analysis and chat
     const claudeKey = process.env.CLAUDE_API_KEY;
     if (!claudeKey) {
       console.warn("CLAUDE_API_KEY not set — AI analysis features will not work.");
     }
     this.claude = new Anthropic({
       apiKey: claudeKey || "",
+      dangerouslyAllowBrowser: true,
+    });
+
+    // OpenAI Whisper — for audio transcription
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) {
+      console.warn("OPENAI_API_KEY not set — Audio transcription will not work.");
+    }
+    this.openai = new OpenAI({
+      apiKey: openaiKey || "",
       dangerouslyAllowBrowser: true,
     });
   }
@@ -193,7 +206,31 @@ export class GeminiService {
   }
 
   async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    const prompt = `Context: ${context}\n\n(Audio could not be transcribed automatically. Provide general feedback on how to answer this question well based on the context.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
+    let transcript = "";
+    try {
+      // Convert base64 to File for Whisper API
+      const byteCharacters = atob(audioBase64);
+      const byteArray = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteArray[i] = byteCharacters.charCodeAt(i);
+      }
+      const blob = new Blob([byteArray], { type: mimeType });
+      const audioFile = new File([blob], "audio.webm", { type: mimeType });
+
+      const transcription = await this.openai.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-1",
+        language: "en",
+      });
+      transcript = transcription.text;
+    } catch (err) {
+      console.warn("Whisper transcription failed, analysing without transcript:", err);
+    }
+
+    const prompt = transcript
+      ? `Context: ${context}\n\nUser's spoken transcript (transcribed by Whisper AI):\n"${transcript}"\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions. Pay special attention to pronunciation issues common among Uzbek English learners.`
+      : `Context: ${context}\n\n(Audio transcription failed. Provide general feedback on how to answer this question well based on the context.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
+
     return this.generateText(prompt);
   }
 
