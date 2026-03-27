@@ -206,32 +206,69 @@ export class GeminiService {
   }
 
   async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    let transcript = "";
+    // Determine audio format for GPT-4o audio preview
+    const format = mimeType.includes("webm") ? "webm"
+      : mimeType.includes("mp4") || mimeType.includes("m4a") ? "mp4"
+      : mimeType.includes("wav") ? "wav"
+      : mimeType.includes("ogg") ? "ogg"
+      : "webm";
+
     try {
-      // Convert base64 to File for Whisper API
-      const byteCharacters = atob(audioBase64);
-      const byteArray = new Uint8Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteArray[i] = byteCharacters.charCodeAt(i);
-      }
-      const blob = new Blob([byteArray], { type: mimeType });
-      const audioFile = new File([blob], "audio.webm", { type: mimeType });
-
-      const transcription = await this.openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        language: "en",
+      // GPT-4o audio preview — hears the audio directly for real pronunciation/fluency analysis
+      const response = await (this.openai.chat.completions.create as any)({
+        model: "gpt-4o-audio-preview",
+        modalities: ["text"],
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_audio",
+                input_audio: { data: audioBase64, format },
+              },
+              {
+                type: "text",
+                text: `Context: ${context}\n\nListen to my spoken English response carefully. Evaluate my pronunciation accuracy, speaking fluency (pace, pauses, rhythm), and provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`,
+              },
+            ],
+          },
+        ],
+        max_tokens: 2048,
       });
-      transcript = transcription.text;
-    } catch (err) {
-      console.warn("Whisper transcription failed, analysing without transcript:", err);
+
+      const text: string = response.choices[0]?.message?.content ?? "Tahlil qilib bo'lmadi.";
+      return { text } as unknown as GenerateContentResponse;
+    } catch (gptErr) {
+      console.warn("GPT-4o audio failed, falling back to Whisper + Claude:", gptErr);
+
+      // Fallback: Whisper transcription → Claude analysis
+      let transcript = "";
+      try {
+        const byteCharacters = atob(audioBase64);
+        const byteArray = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteArray[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteArray], { type: mimeType });
+        const audioFile = new File([blob], `audio.${format}`, { type: mimeType });
+
+        const transcription = await this.openai.audio.transcriptions.create({
+          file: audioFile,
+          model: "whisper-1",
+          language: "en",
+        });
+        transcript = transcription.text;
+      } catch (whisperErr) {
+        console.warn("Whisper transcription also failed:", whisperErr);
+      }
+
+      const prompt = transcript
+        ? `Context: ${context}\n\nUser's spoken transcript (transcribed by Whisper):\n"${transcript}"\n\nProvide feedback EXACTLY as per the FEEDBACK FORMAT. Note common Uzbek learner pronunciation issues based on the words used.`
+        : `Context: ${context}\n\n(Audio could not be processed. Provide general feedback on how to answer this question well.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
+
+      return this.generateText(prompt);
     }
-
-    const prompt = transcript
-      ? `Context: ${context}\n\nUser's spoken transcript (transcribed by Whisper AI):\n"${transcript}"\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions. Pay special attention to pronunciation issues common among Uzbek English learners.`
-      : `Context: ${context}\n\n(Audio transcription failed. Provide general feedback on how to answer this question well based on the context.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
-
-    return this.generateText(prompt);
   }
 
   async chat(history: { role: "user" | "model", text: string }[], newMessage: string, context: string): Promise<GenerateContentResponse> {
