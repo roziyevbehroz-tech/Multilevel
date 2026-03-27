@@ -153,14 +153,14 @@ const PRACTICE_BANK: Record<string, { description: string; level: string; sets: 
   },
 };
 
-// Add mock test questions to practice bank
+// Add mock test questions to practice bank as individual practice items
 MOCK_TESTS.forEach((mockTest, testIndex) => {
   mockTest.questions.forEach((question) => {
     const part = question.part;
     if (PRACTICE_BANK[part]) {
-      // Create a set for each mock test's question
-      const setId = `mock_${testIndex + 1}_${part.replace(/\./g, "_")}_${question.id}`;
-      const setTitle = `Mock Test ${testIndex + 1} - ${part}`;
+      // Create an individual practice set for each question
+      const setId = `mock_${testIndex + 1}_${question.id}`;
+      const setTitle = `${mockTest.description} (Mock ${testIndex + 1})`;
       PRACTICE_BANK[part].sets.push({
         id: setId,
         title: setTitle,
