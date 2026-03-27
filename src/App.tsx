@@ -155,6 +155,7 @@ const PRACTICE_BANK: Record<string, { description: string; level: string; sets: 
 
 const LessonLabAssistant: React.FC = () => {
   const [isAITeacherOpen, setIsAITeacherOpen] = useState(false);
+  const [aiPanelWidth, setAiPanelWidth] = useState(480);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
   const [initialSelectedAnswer, setInitialSelectedAnswer] = useState<SavedAnswer | null>(null);
   const [messages, setMessages] = useState<Message[]>([
@@ -904,7 +905,10 @@ AGAINST3: [argument against]`,
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] text-[#1E293B] font-sans pb-12 selection:bg-[#1E73BE]/30">
+    <div
+      className="min-h-screen bg-[#F4F6F8] text-[#1E293B] font-sans pb-12 selection:bg-[#1E73BE]/30 transition-[margin-right] duration-300 ease-in-out"
+      style={{ marginRight: isAITeacherOpen && window.innerWidth >= 768 ? aiPanelWidth : 0 }}
+    >
       <HistorySidebar 
         refreshTrigger={historyRefreshTrigger} 
         onOpenAITeacher={(answer) => {
@@ -912,13 +916,11 @@ AGAINST3: [argument against]`,
           setIsAITeacherOpen(true);
         }} 
       />
-      <AITeacherPanel 
-        isOpen={isAITeacherOpen} 
-        onClose={() => {
-          setIsAITeacherOpen(false);
-          setInitialSelectedAnswer(null);
-        }} 
+      <AITeacherPanel
+        isOpen={isAITeacherOpen}
+        onClose={() => { setIsAITeacherOpen(false); setInitialSelectedAnswer(null); }}
         initialSelectedAnswer={initialSelectedAnswer}
+        onWidthChange={setAiPanelWidth}
       />
       
       {/* Floating AI Teacher Button */}
