@@ -589,8 +589,8 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                                 <User size={12} />
                               ) : isStreaming && idx === messages.length - 1 ? (
                                 <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                  animate={{ scale: [1, 1.35, 1] }}
+                                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
                                   style={{ display: "flex" }}
                                 >
                                   <GraduationCap size={12} />
