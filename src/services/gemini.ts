@@ -1,4 +1,5 @@
 import { GoogleGenAI, LiveServerMessage, Modality, GenerateContentResponse } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { Message } from "../types";
 
 const SYSTEM_PROMPT = `You are the "LessonLab Speaking Assistant," an expert English Speaking Examiner for the Uzbekistan Multi-level English Exam (CEFR). Your goal is to evaluate the user's spoken responses (provided as text transcripts) strictly according to the official Multi-level format, timing, and grading rubrics.
@@ -72,19 +73,30 @@ Whenever the user asks for analysis of their answer, you must structure your res
 
 export class GeminiService {
   private ai: GoogleGenAI;
-  // Use stable model names (not preview/dated versions that expire)
-  private model: string = "gemini-2.0-flash";
+  private claude: Anthropic;
+  private claudeModel: string = "claude-haiku-4-5-20251001";
   private liveModel: string = "gemini-2.0-flash-live-001";
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY is not set! AI features will not work.");
+    // Google Gemini — only for Live API (real-time voice)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      console.warn("GEMINI_API_KEY not set — Live voice features will not work.");
     }
-    this.ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    this.ai = new GoogleGenAI({ apiKey: geminiKey || "" });
+
+    // Claude — for text analysis, chat, audio analysis
+    const claudeKey = process.env.CLAUDE_API_KEY;
+    if (!claudeKey) {
+      console.warn("CLAUDE_API_KEY not set — AI analysis features will not work.");
+    }
+    this.claude = new Anthropic({
+      apiKey: claudeKey || "",
+      dangerouslyAllowBrowser: true,
+    });
   }
 
-  // Retry wrapper for quota/rate-limit errors (429, 503)
+  // Retry wrapper for quota/rate-limit errors
   private async withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -94,20 +106,18 @@ export class GeminiService {
         const isRetryable = status === 429 || status === 503 ||
           err?.message?.includes("quota") ||
           err?.message?.includes("RESOURCE_EXHAUSTED") ||
-          err?.message?.includes("rate");
+          err?.message?.includes("rate") ||
+          err?.message?.includes("overloaded");
 
         if (isRetryable && attempt < maxRetries) {
-          // Extract retryDelay from error if available, otherwise exponential backoff
-          const retryMatch = JSON.stringify(err)?.match(/"retryDelay":"(\d+)s"/);
-          const delay = retryMatch ? parseInt(retryMatch[1]) * 1000 : (2 ** attempt) * 2000;
-          console.warn(`API quota/rate limit hit (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`);
+          const delay = (2 ** attempt) * 2000;
+          console.warn(`API rate limit (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
 
-        // Not retryable or max retries exceeded — throw with clear message
         const errorMsg = err?.message || JSON.stringify(err);
-        if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+        if (errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || status === 429) {
           throw new Error(`API kvota limiti tugagan. Iltimos bir necha daqiqa kutib qayta urinib ko'ring. (${errorMsg})`);
         }
         throw err;
@@ -115,6 +125,8 @@ export class GeminiService {
     }
     throw new Error("Max retries exceeded");
   }
+
+  // ── GEMINI LIVE (unchanged — real-time voice) ──────────────────────────
 
   connectLive(callbacks: {
     onopen: () => void;
@@ -164,63 +176,70 @@ export class GeminiService {
     });
   }
 
+  // ── CLAUDE TEXT ANALYSIS ───────────────────────────────────────────────
+
   async generateText(prompt: string): Promise<GenerateContentResponse> {
-    return this.withRetry(() =>
-      this.ai.models.generateContent({
-        model: this.model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-        }
-      })
-    );
+    const text = await this.withRetry(async () => {
+      const response = await this.claude.messages.create({
+        model: this.claudeModel,
+        max_tokens: 2048,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: prompt }],
+      });
+      return (response.content[0] as any).text as string;
+    });
+
+    // Return in Gemini-compatible shape so callers don't change
+    return { text: () => text } as unknown as GenerateContentResponse;
   }
 
   async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    if (!audioBase64) {
-      throw new Error("Audio data is empty — audio yozib olinmagan");
+    // Claude doesn't support inline audio — transcribe via Gemini flash, then analyse with Claude
+    let transcript = "";
+    try {
+      const transcribeResp = await this.ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { data: audioBase64, mimeType } },
+            { text: "Please transcribe this audio exactly, word for word. Return only the transcript text, nothing else." }
+          ]
+        }],
+      });
+      transcript = (transcribeResp.text as any) ?? "";
+    } catch (err) {
+      console.warn("Audio transcription failed, analysing without transcript:", err);
     }
-    return this.withRetry(() =>
-      this.ai.models.generateContent({
-        model: this.model,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { data: audioBase64, mimeType } },
-              { text: `Analyze this speaking response. Context: ${context}. Please provide feedback EXACTLY as per the FEEDBACK FORMAT in the system instructions.` }
-            ]
-          }
-        ],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-        }
-      })
-    );
+
+    const prompt = transcript
+      ? `Context: ${context}\n\nUser's spoken transcript:\n"${transcript}"\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`
+      : `Context: ${context}\n\n(Audio could not be transcribed. Provide general feedback on how to answer this question well.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
+
+    return this.generateText(prompt);
   }
 
   async chat(history: { role: "user" | "model", text: string }[], newMessage: string, context: string): Promise<GenerateContentResponse> {
-    const contents = history.map(msg => ({
-      role: msg.role === "model" ? "model" as const : "user" as const,
-      parts: [{ text: msg.text }]
+    const messages: Anthropic.MessageParam[] = history.map(msg => ({
+      role: msg.role === "model" ? "assistant" as const : "user" as const,
+      content: msg.text,
     }));
 
     if (newMessage) {
-      contents.push({
-        role: "user" as const,
-        parts: [{ text: newMessage }]
-      });
+      messages.push({ role: "user", content: newMessage });
     }
 
-    return this.withRetry(() =>
-      this.ai.models.generateContent({
-        model: this.model,
-        contents: contents,
-        config: {
-          systemInstruction: context,
-        }
-      })
-    );
+    const text = await this.withRetry(async () => {
+      const response = await this.claude.messages.create({
+        model: this.claudeModel,
+        max_tokens: 2048,
+        system: context,
+        messages,
+      });
+      return (response.content[0] as any).text as string;
+    });
+
+    return { text: () => text } as unknown as GenerateContentResponse;
   }
 }
 
