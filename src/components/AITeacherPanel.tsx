@@ -233,7 +233,8 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
         }
       }
 
-      const response = await gemini.analyzeAudio(audioBase64, "audio/webm", context);
+      const audioMime = audioBlob.type || "audio/webm";
+      const response = await gemini.analyzeAudio(audioBase64, audioMime, context);
       const responseText = response.text || "Kechirasiz, tahlil qila olmadim. Iltimos qayta urinib ko'ring.";
 
       if (isReRecord) {
@@ -340,12 +341,23 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const recorder = new MediaRecorder(stream);
+      // Detect supported codec — fallback for Android 7 / older browsers
+      const mimeType = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+        "audio/mp4",
+        "",
+      ].find(t => !t || MediaRecorder.isTypeSupported(t)) ?? "";
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const recordedMime = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: recordedMime });
         const url = URL.createObjectURL(blob);
         setReRecordedAudioUrl(url);
         setReRecordedBlob(blob);

@@ -107,7 +107,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
       3. Umumiy tavsiyalar ber.
       4. Ushbu savol uchun yuqori ball oladigan 'model answer' (namunaviy javob) yozib ber va foydalanuvchining javobi bilan solishtirib, lug'at va grammatika bo'yicha farqlarni jadval ko'rinishida ko'rsat.`;
       
-      const response = await gemini.analyzeAudio(audioBase64, "audio/webm", context);
+      const audioMime = answer.audioBlob.type || "audio/webm";
+      const response = await gemini.analyzeAudio(audioBase64, audioMime, context);
       const analysisText = response.text || "Tahlil qilib bo'lmadi.";
       
       // Update in localforage
