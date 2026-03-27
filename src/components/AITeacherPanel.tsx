@@ -13,6 +13,7 @@ interface AITeacherPanelProps {
   isOpen: boolean;
   onClose: () => void;
   initialSelectedAnswer?: SavedAnswer | null;
+  onWidthChange?: (w: number) => void;
 }
 
 const EXAMINER_CONTEXT = `Sen Uzbekiston Multi-level English Exam (CEFR) bo'yicha eng yuqori malakali Professional Examiner AI o'qituvchisan.
@@ -76,7 +77,7 @@ Muhim qoidalar:
 - Xatolarni yumshoq, lekin ANIQ ko'rsat
 - Foydalanuvchi qayta yozdirib tahlil so'rasa, oldingi javob bilan SOLISHTIR va o'sishni ko'rsat`;
 
-export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose, initialSelectedAnswer }) => {
+export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose, initialSelectedAnswer, onWidthChange }) => {
   const [savedAnswers, setSavedAnswers] = useState<SavedAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<SavedAnswer | null>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "vocab" | "progress">("chat");
@@ -123,6 +124,9 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Sync panel width to parent (for desktop push layout)
+  useEffect(() => { onWidthChange?.(panelWidth); }, [panelWidth, onWidthChange]);
 
   // Parse suggestions from last AI message when streaming ends
   useEffect(() => {
@@ -508,13 +512,13 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — mobile only (desktop uses push layout, no overlay) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-gradient-to-br from-violet-950/60 to-indigo-950/60 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-gradient-to-br from-violet-950/60 to-indigo-950/60 backdrop-blur-sm z-40 md:hidden"
           />
           {/* Panel */}
           <motion.div

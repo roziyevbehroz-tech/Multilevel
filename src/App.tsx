@@ -155,6 +155,7 @@ const PRACTICE_BANK: Record<string, { description: string; level: string; sets: 
 
 const LessonLabAssistant: React.FC = () => {
   const [isAITeacherOpen, setIsAITeacherOpen] = useState(false);
+  const [aiPanelWidth, setAiPanelWidth] = useState(480);
   const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
   const [initialSelectedAnswer, setInitialSelectedAnswer] = useState<SavedAnswer | null>(null);
   const [messages, setMessages] = useState<Message[]>([
@@ -459,7 +460,7 @@ const LessonLabAssistant: React.FC = () => {
     if (isPrepTime && prepTimeLeft !== null && prepTimeLeft <= 0) {
       setIsPrepTime(false);
       setPrepTimeLeft(null);
-      playBeep("start");
+      playBeepRef.current("start");
       startLiveSessionRef.current();
     }
   }, [isPrepTime, prepTimeLeft]);
@@ -478,7 +479,7 @@ const LessonLabAssistant: React.FC = () => {
   useEffect(() => {
     if (isLive && timeLeft !== null && timeLeft <= 0 && !autoStopFiredRef.current) {
       autoStopFiredRef.current = true;
-      playBeep("end");
+      playBeepRef.current("end");
       stopLiveSessionRef.current(true);
     }
     if (!isLive) {
@@ -729,12 +730,21 @@ const LessonLabAssistant: React.FC = () => {
   };
 
   // ── Beep sounds via Web Audio API ─────────────────────────────────────
-  const playBeep = (type: "start" | "end") => {
+  const beepCtxRef = useRef<AudioContext | null>(null);
+
+  const playBeep = async (type: "start" | "end") => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // Reuse or create AudioContext
+      if (!beepCtxRef.current || beepCtxRef.current.state === "closed") {
+        beepCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = beepCtxRef.current;
+      // Resume if suspended (browser autoplay policy)
+      if (ctx.state === "suspended") await ctx.resume();
+
       const schedule = type === "start"
-        ? [{ freq: 880, t: 0 }, { freq: 1100, t: 0.18 }]   // ascending "ding-ding"
-        : [{ freq: 880, t: 0 }, { freq: 660, t: 0.2 }];    // descending "dong-dong"
+        ? [{ freq: 880, t: 0 }, { freq: 1100, t: 0.2 }]   // ascending ding-ding
+        : [{ freq: 880, t: 0 }, { freq: 600, t: 0.22 }];  // descending dong-dong
 
       schedule.forEach(({ freq, t }) => {
         const osc = ctx.createOscillator();
@@ -743,17 +753,18 @@ const LessonLabAssistant: React.FC = () => {
         gain.connect(ctx.destination);
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
-        gain.gain.setValueAtTime(0, ctx.currentTime + t);
-        gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + t + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.32);
+        gain.gain.setValueAtTime(0.001, ctx.currentTime + t);
+        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.35);
         osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.35);
+        osc.stop(ctx.currentTime + t + 0.4);
       });
-      setTimeout(() => ctx.close(), 1200);
     } catch (e) {
       console.warn("Beep failed:", e);
     }
   };
+  const playBeepRef = useRef(playBeep);
+  useEffect(() => { playBeepRef.current = playBeep; });
 
   // Keep function refs updated every render (avoids stale closures in useEffects)
   useEffect(() => { startLiveSessionRef.current = startLiveSession; });
@@ -904,7 +915,10 @@ AGAINST3: [argument against]`,
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] text-[#1E293B] font-sans pb-12 selection:bg-[#1E73BE]/30">
+    <div
+      className="min-h-screen bg-[#F4F6F8] text-[#1E293B] font-sans pb-12 selection:bg-[#1E73BE]/30 transition-[margin-right] duration-300 ease-in-out"
+      style={{ marginRight: isAITeacherOpen && window.innerWidth >= 768 ? aiPanelWidth : 0 }}
+    >
       <HistorySidebar 
         refreshTrigger={historyRefreshTrigger} 
         onOpenAITeacher={(answer) => {
@@ -912,13 +926,11 @@ AGAINST3: [argument against]`,
           setIsAITeacherOpen(true);
         }} 
       />
-      <AITeacherPanel 
-        isOpen={isAITeacherOpen} 
-        onClose={() => {
-          setIsAITeacherOpen(false);
-          setInitialSelectedAnswer(null);
-        }} 
+      <AITeacherPanel
+        isOpen={isAITeacherOpen}
+        onClose={() => { setIsAITeacherOpen(false); setInitialSelectedAnswer(null); }}
         initialSelectedAnswer={initialSelectedAnswer}
+        onWidthChange={setAiPanelWidth}
       />
       
       {/* Floating AI Teacher Button */}
