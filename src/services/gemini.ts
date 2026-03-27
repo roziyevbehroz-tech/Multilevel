@@ -194,7 +194,7 @@ export class GeminiService {
   }
 
   async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    // Claude doesn't support inline audio — transcribe via Gemini flash, then analyse with Claude
+    // Gemini flash — transcribe audio, then Claude analyses the text
     let transcript = "";
     try {
       const transcribeResp = await this.ai.models.generateContent({
