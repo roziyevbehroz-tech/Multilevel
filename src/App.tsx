@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Sparkles,
   ArrowRight,
+  GraduationCap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -892,15 +893,36 @@ AGAINST3: [argument against]`,
       />
       
       {/* Floating AI Teacher Button */}
-      {!isAITeacherOpen && (
-        <button
-          onClick={() => setIsAITeacherOpen(true)}
-          className="fixed bottom-6 right-6 bg-indigo-600 text-white px-5 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all hover:scale-105 z-40 flex items-center gap-2"
-        >
-          <Bot size={22} />
-          <span className="font-bold text-sm">AI Yordam</span>
-        </button>
-      )}
+      <AnimatePresence>
+        {!isAITeacherOpen && (
+          <motion.button
+            onClick={() => setIsAITeacherOpen(true)}
+            className="fixed bottom-6 right-5 z-40"
+            initial={{ scale: 0.7, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.7, opacity: 0, y: 20 }}
+            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+          >
+            {/* Glow halo */}
+            <span className="absolute inset-0 rounded-2xl bg-indigo-500 opacity-40 blur-xl animate-pulse pointer-events-none" />
+            {/* Button body */}
+            <span className="relative flex items-center gap-3 bg-gradient-to-br from-violet-600 via-indigo-500 to-purple-700 text-white pl-4 pr-5 py-3 rounded-2xl shadow-[0_8px_24px_rgba(99,102,241,0.55)]">
+              {/* Icon with sparkle badge */}
+              <span className="relative shrink-0 bg-white/15 rounded-xl p-1.5">
+                <GraduationCap size={20} />
+                <Sparkles size={8} className="absolute -top-1 -right-1 text-yellow-300" />
+              </span>
+              {/* Label */}
+              <span className="flex flex-col items-start leading-none gap-0.5">
+                <span className="text-[9px] font-semibold tracking-widest text-indigo-200 uppercase">Multilevel</span>
+                <span className="text-sm font-bold tracking-wide">AI Examiner</span>
+              </span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
       <header className="bg-white border-b border-gray-200 flex flex-col">
