@@ -185,7 +185,7 @@ export class GeminiService {
       try {
         const stream = this.claude.messages.stream({
           model: this.claudeModel,
-          max_tokens: 1200,
+          max_tokens: 2000,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: prompt }],
         });
@@ -204,7 +204,7 @@ export class GeminiService {
     const text = await this.withRetry(async () => {
       const response = await this.claude.messages.create({
         model: this.claudeModel,
-        max_tokens: 1200,
+        max_tokens: 2000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
       });
@@ -240,7 +240,7 @@ export class GeminiService {
             ],
           },
         ],
-        max_tokens: 1200,
+        max_tokens: 2000,
         stream: true,
       });
 

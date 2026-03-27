@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Send, Loader2, Bot, User, Trash2, MessageSquare, BookOpen, BarChart, Mic, Square, RotateCcw } from "lucide-react";
+import { X, Send, Loader2, GraduationCap, Sparkles, User, Trash2, MessageSquare, BookOpen, BarChart, Mic, Square, RotateCcw } from "lucide-react";
 import localforage from "localforage";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -262,17 +262,23 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
         setSavedAnswers(prev => prev.map(a => a.id === updatedAnswer.id ? updatedAnswer : a));
       }
 
-      // Parse and save vocabulary
-      const vocabMatches = responseText.match(/\[VOCAB_START\]([\s\S]*?)\[VOCAB_END\]/g);
-      if (vocabMatches) {
-        for (const match of vocabMatches) {
-          const jsonStr = match.replace(/\[VOCAB_START\]|\[VOCAB_END\]/g, "").trim();
-          try {
-            const vocab = JSON.parse(jsonStr);
-            const id = `vocab_${Date.now()}_${vocab.word}`;
-            await localforage.setItem(id, { ...vocab, id, timestamp: Date.now() });
-          } catch (e) {
-            console.error("Error parsing vocab:", e);
+      // Parse and save vocabulary — handle single or multiple JSON objects per block
+      const vocabBlockMatches = responseText.match(/\[VOCAB_START\]([\s\S]*?)\[VOCAB_END\]/g);
+      if (vocabBlockMatches) {
+        for (const block of vocabBlockMatches) {
+          const content = block.replace(/\[VOCAB_START\]|\[VOCAB_END\]/g, "").trim();
+          // Extract each JSON object individually (handles multiple per block)
+          const jsonObjects = content.match(/\{[^{}]+\}/g) || [];
+          for (const jsonStr of jsonObjects) {
+            try {
+              const vocab = JSON.parse(jsonStr);
+              if (vocab.word) {
+                const id = `vocab_${Date.now()}_${vocab.word.replace(/\s+/g, "_")}`;
+                await localforage.setItem(id, { ...vocab, id, timestamp: Date.now() });
+              }
+            } catch (e) {
+              console.error("Error parsing vocab object:", e, jsonStr);
+            }
           }
         }
       }
@@ -457,8 +463,9 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
             {/* Header */}
             <div className="p-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <div className="bg-white/20 p-1.5 rounded-lg">
-                  <Bot size={22} />
+                <div className="relative bg-white/20 p-1.5 rounded-xl">
+                  <GraduationCap size={22} />
+                  <Sparkles size={9} className="absolute -top-1 -right-1 text-yellow-300" />
                 </div>
                 <div>
                   <h2 className="font-bold text-lg leading-tight">AI Examiner</h2>
@@ -501,7 +508,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                     <h3 className="font-bold text-gray-700 mb-4">Saqlangan javoblaringiz:</h3>
                     {savedAnswers.length === 0 ? (
                       <div className="text-center mt-10 px-4">
-                        <Bot size={48} className="mx-auto text-gray-300 mb-4" />
+                        <GraduationCap size={48} className="mx-auto text-gray-300 mb-4" />
                         <p className="text-gray-500">Hali hech qanday javob saqlanmagan.</p>
                         <p className="text-gray-400 text-sm mt-2">Mock yoki Practice rejimida javob berganingizda ular shu yerda paydo bo'ladi.</p>
                       </div>
@@ -586,10 +593,10 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                                   transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
                                   style={{ display: "flex" }}
                                 >
-                                  <Bot size={12} />
+                                  <GraduationCap size={12} />
                                 </motion.div>
                               ) : (
-                                <Bot size={12} />
+                                <GraduationCap size={12} />
                               )}
                               <span className="text-[10px] font-bold uppercase">
                                 {msg.role === "user" ? "Siz" : "AI Examiner"}
@@ -613,7 +620,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                                 transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
                                 style={{ display: "flex" }}
                               >
-                                <Bot size={12} />
+                                <GraduationCap size={12} />
                               </motion.div>
                               <span className="text-[10px] font-bold uppercase">AI Examiner</span>
                             </div>
