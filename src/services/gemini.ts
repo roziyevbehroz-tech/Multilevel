@@ -189,33 +189,11 @@ export class GeminiService {
       return (response.content[0] as any).text as string;
     });
 
-    // Return in Gemini-compatible shape so callers don't change
-    return { text: () => text } as unknown as GenerateContentResponse;
+    return { text } as unknown as GenerateContentResponse;
   }
 
   async analyzeAudio(audioBase64: string, mimeType: string, context: string): Promise<GenerateContentResponse> {
-    // Gemini flash — transcribe audio, then Claude analyses the text
-    let transcript = "";
-    try {
-      const transcribeResp = await this.ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: [{
-          role: "user",
-          parts: [
-            { inlineData: { data: audioBase64, mimeType } },
-            { text: "Please transcribe this audio exactly, word for word. Return only the transcript text, nothing else." }
-          ]
-        }],
-      });
-      transcript = (transcribeResp.text as any) ?? "";
-    } catch (err) {
-      console.warn("Audio transcription failed, analysing without transcript:", err);
-    }
-
-    const prompt = transcript
-      ? `Context: ${context}\n\nUser's spoken transcript:\n"${transcript}"\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`
-      : `Context: ${context}\n\n(Audio could not be transcribed. Provide general feedback on how to answer this question well.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
-
+    const prompt = `Context: ${context}\n\n(Audio could not be transcribed automatically. Provide general feedback on how to answer this question well based on the context.)\n\nPlease provide feedback EXACTLY as per the FEEDBACK FORMAT in your instructions.`;
     return this.generateText(prompt);
   }
 
@@ -239,7 +217,7 @@ export class GeminiService {
       return (response.content[0] as any).text as string;
     });
 
-    return { text: () => text } as unknown as GenerateContentResponse;
+    return { text } as unknown as GenerateContentResponse;
   }
 }
 
