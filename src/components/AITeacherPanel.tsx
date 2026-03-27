@@ -83,6 +83,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const [messages, setMessages] = useState<{ role: "user" | "model"; text: string }[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Re-recording state
@@ -239,6 +240,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       const prefix = isReRecord ? "🔄 **Yangi javobingiz tahlili:**\n\n" : "";
       setMessages(prev => [...prev, { role: "model", text: prefix }]);
       setIsTyping(false);
+      setIsStreaming(true);
 
       let fullResponseText = prefix;
       const response = await gemini.analyzeAudio(audioBase64, audioMime, context, (chunk) => {
@@ -298,6 +300,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       }]);
     } finally {
       setIsTyping(false);
+      setIsStreaming(false);
       if (isReRecord) setIsAnalyzingReRecord(false);
     }
   };
@@ -324,6 +327,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       // Add empty placeholder for streaming
       setMessages(prev => [...prev, { role: "model", text: "" }]);
       setIsTyping(false);
+      setIsStreaming(true);
 
       let streamedText = "";
       await gemini.chat(chatHistory, userMessage, context, (chunk) => {
@@ -342,6 +346,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       }]);
     } finally {
       setIsTyping(false);
+      setIsStreaming(false);
     }
   };
 
@@ -573,10 +578,25 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                               : "bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm"
                           }`}>
                             <div className="flex items-center gap-2 mb-1 opacity-70">
-                              {msg.role === "user" ? <User size={12} /> : <Bot size={12} />}
+                              {msg.role === "user" ? (
+                                <User size={12} />
+                              ) : isStreaming && idx === messages.length - 1 ? (
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                  style={{ display: "flex" }}
+                                >
+                                  <Bot size={12} />
+                                </motion.div>
+                              ) : (
+                                <Bot size={12} />
+                              )}
                               <span className="text-[10px] font-bold uppercase">
                                 {msg.role === "user" ? "Siz" : "AI Examiner"}
                               </span>
+                              {msg.role === "model" && isStreaming && idx === messages.length - 1 && (
+                                <span className="text-[9px] text-indigo-400 font-medium animate-pulse ml-1">yozmoqda...</span>
+                              )}
                             </div>
                             <div className="text-sm prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:text-xs [&_th]:bg-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-gray-100 [&_tr:nth-child(even)_td]:bg-gray-50 [&_tr:hover_td]:bg-indigo-50 [&_table]:shadow-sm">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
@@ -586,9 +606,27 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                       ))}
                       {isTyping && (
                         <div className="flex justify-start">
-                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-4 shadow-sm flex items-center gap-2 text-gray-500">
-                            <Loader2 size={16} className="animate-spin" />
-                            <span className="text-sm">AI Examiner tahlil qilmoqda...</span>
+                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2 opacity-60">
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                style={{ display: "flex" }}
+                              >
+                                <Bot size={12} />
+                              </motion.div>
+                              <span className="text-[10px] font-bold uppercase">AI Examiner</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-1">
+                              {[0, 1, 2].map(i => (
+                                <motion.div
+                                  key={i}
+                                  className="w-2.5 h-2.5 bg-indigo-400 rounded-full"
+                                  animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
+                                  transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}
