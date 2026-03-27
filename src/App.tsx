@@ -1878,23 +1878,61 @@ AGAINST3: [argument against]`,
                       />
                     </div>
 
-                    <div className="bg-white rounded-lg p-6 border border-indigo-100 shadow-sm">
-                      <div className="flex items-center gap-2 text-indigo-700 font-bold uppercase tracking-wider text-sm mb-4">
-                        <Bot size={18} /> Super AI Agent Tahlili:
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => {
+                        if (answer.analysis) {
+                          setInitialSelectedAnswer({
+                            id: `mock_${selectedMockTest}_${idx}`,
+                            part: q.part,
+                            questionText: q.text,
+                            audioBlob: null,
+                            audioUrl: answer.audioUrl,
+                            analysis: answer.analysis,
+                            timestamp: Date.now(),
+                          });
+                          setIsAITeacherOpen(true);
+                        }
+                      }}
+                      disabled={!answer.analysis}
+                      className="w-full text-left"
+                    >
+                      <div className={`bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border-2 transition-all ${
+                        answer.analysis
+                          ? "border-indigo-300 hover:border-indigo-500 hover:shadow-lg cursor-pointer"
+                          : "border-gray-200 opacity-60"
+                      }`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-lg">
+                              <Bot size={18} className="text-white" />
+                            </div>
+                            <span className="text-indigo-700 font-bold uppercase tracking-wider text-sm">Super AI Agent Tahlili</span>
+                          </div>
+                          {answer.analysis && (
+                            <span className="text-indigo-600 text-xs font-semibold px-3 py-1 bg-indigo-100 rounded-full">
+                              Ochish →
+                            </span>
+                          )}
+                        </div>
+                        {answer.isAnalyzing ? (
+                          <div className="flex items-center gap-3 text-indigo-600 py-4">
+                            <Loader2 size={20} className="animate-spin" />
+                            <span className="font-medium text-sm">Tahlil qilinmoqda...</span>
+                          </div>
+                        ) : answer.analysis ? (
+                          <div>
+                            <p className="text-gray-700 text-sm line-clamp-2 leading-relaxed">
+                              {answer.analysis.split('\n')[0].substring(0, 150)}...
+                            </p>
+                            <p className="text-indigo-600 text-xs font-semibold mt-3">Batafsil tahlil uchun oching →</p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">Tahlil kutilmoqda...</p>
+                        )}
                       </div>
-                      {answer.isAnalyzing ? (
-                        <div className="flex items-center gap-3 text-indigo-600 py-4">
-                          <Loader2 size={24} className="animate-spin" />
-                          <span className="font-medium">
-                            Tahlil qilinmoqda...
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="markdown-body prose prose-indigo max-w-none prose-sm md:prose-base">
-                          <ReactMarkdown>{answer.analysis || ""}</ReactMarkdown>
-                        </div>
-                      )}
-                    </div>
+                    </motion.button>
                   </div>
                 );
               })}
