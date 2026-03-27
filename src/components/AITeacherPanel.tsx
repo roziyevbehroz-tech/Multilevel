@@ -110,6 +110,12 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Audio level analysis for real-time visualizer
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+
   // Track if initial analysis was already triggered for this answer
   const analysisTriggeredRef = useRef<string | null>(null);
 
@@ -443,6 +449,31 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       setIsRecording(true);
       setRecordingTime(0);
 
+      // Audio level analyser (real-time mic visualization)
+      try {
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.5;
+        source.connect(analyser);
+        audioContextRef.current = audioCtx;
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const updateLevel = () => {
+          analyser.getByteFrequencyData(dataArray);
+          // Average of lower frequencies (voice range)
+          const slice = dataArray.slice(0, 40);
+          const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+          setAudioLevel(Math.min(avg / 128, 1)); // normalize 0-1
+          animFrameRef.current = requestAnimationFrame(updateLevel);
+        };
+        updateLevel();
+      } catch (e) {
+        console.warn("AudioContext not supported for visualizer:", e);
+      }
+
       // Timer
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -461,11 +492,52 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+    }
+    setAudioLevel(0);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
     mediaRecorderRef.current = null;
     setIsRecording(false);
+  }, []);
+
+  const cancelRecording = useCallback(() => {
+    // Stop recording and discard the result
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+    }
+    setAudioLevel(0);
+    // Discard chunks so onstop produces empty/discarded blob
+    chunksRef.current = [];
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setIsRecording(false);
+    setReRecordedAudioUrl(null);
+    setReRecordedBlob(null);
   }, []);
 
   const handleReRecordAnalysis = () => {
@@ -811,62 +883,87 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                       </motion.div>
                     )}
 
-                    {/* Text input with integrated microphone */}
+                    {/* Telegram-style input bar */}
                     <div className="px-3 pb-3 pt-1.5 bg-white/60 backdrop-blur-sm border-t border-violet-100/40 shrink-0">
-                      {isRecording && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                          className="flex items-center gap-2 mb-2 px-3 py-2 bg-rose-50/80 border border-rose-200/60 rounded-xl">
-                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.2, repeat: Infinity }}
-                            className="w-2.5 h-2.5 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                          <span className="text-rose-700 font-mono text-sm font-bold flex-1">{formatTime(recordingTime)}</span>
-                          <button onClick={stopRecording} className="text-rose-600 hover:text-rose-700 transition-colors">
-                            <Square size={14} fill="currentColor" />
-                          </button>
-                        </motion.div>
-                      )}
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={input}
-                          onChange={(e) => setInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                          placeholder={quotedText ? "Iqtibosga javob yozing..." : "Savol yoki fikringizni yozing..."}
-                          className="flex-1 bg-white/70 backdrop-blur-sm border border-violet-200/60 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200/50 placeholder-gray-400 transition-all"
-                          disabled={isTyping || isRecording}
-                        />
-                        {/* Microphone button — bottom right */}
-                        <motion.button
-                          whileTap={{ scale: 0.88 }}
-                          onClick={isRecording ? stopRecording : startRecording}
-                          disabled={isTyping || isAnalyzingReRecord}
-                          className="relative shrink-0"
-                        >
-                          <div className={`relative p-2.5 rounded-2xl transition-all ${
-                            isRecording
-                              ? "bg-rose-500 text-white shadow-lg"
-                              : "bg-rose-50/80 text-rose-500 border border-rose-200/60 hover:bg-rose-100/80"
-                          }`}>
-                            <Mic size={17} />
-                          </div>
-                          {/* Recording indicator circle */}
-                          {isRecording && (
-                            <>
-                              <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.8, 0.2, 0.8] }} transition={{ duration: 1.2, repeat: Infinity }}
-                                className="absolute inset-0 rounded-2xl border-2 border-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
-                              <motion.div animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }} transition={{ duration: 1.2, repeat: Infinity }}
-                                className="absolute inset-0 rounded-2xl border border-rose-500/50" />
-                            </>
-                          )}
-                        </motion.button>
-                        {/* Send button */}
-                        <motion.button
-                          whileTap={{ scale: 0.92 }}
-                          onClick={handleSendMessage}
-                          disabled={isTyping || !input.trim() || isRecording}
-                          className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 shadow-md shrink-0"
-                        >
-                          <Send size={17} />
-                        </motion.button>
+                      <div className="flex gap-2 items-end">
+                        {isRecording ? (
+                          /* ── Recording mode ── */
+                          <>
+                            <div className="flex-1 flex items-center gap-2.5 bg-white/70 backdrop-blur-sm border border-rose-200/60 rounded-2xl px-4 py-2.5">
+                              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                              <span className="text-rose-700 font-mono text-sm font-bold">{formatTime(recordingTime)}</span>
+                              <button onClick={cancelRecording}
+                                className="ml-auto text-[11px] text-rose-500 hover:text-rose-700 font-semibold transition-colors uppercase tracking-wide">
+                                Bekor
+                              </button>
+                            </div>
+                            {/* Send/Stop button with live audio ring */}
+                            <motion.button
+                              whileTap={{ scale: 0.88 }}
+                              onClick={stopRecording}
+                              className="relative shrink-0"
+                            >
+                              {/* Live audio level ring */}
+                              <div className="absolute inset-0 rounded-full transition-transform duration-75"
+                                style={{
+                                  transform: `scale(${1 + audioLevel * 0.5})`,
+                                  background: `radial-gradient(circle, rgba(139,92,246,${0.08 + audioLevel * 0.2}) 0%, transparent 70%)`
+                                }}
+                              />
+                              <div className="relative bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-full shadow-md"
+                                style={{
+                                  boxShadow: `0 0 ${4 + audioLevel * 16}px rgba(139,92,246,${0.3 + audioLevel * 0.4})`
+                                }}>
+                                <Send size={17} />
+                              </div>
+                            </motion.button>
+                          </>
+                        ) : (
+                          /* ── Normal mode ── */
+                          <>
+                            <input
+                              type="text"
+                              value={input}
+                              onChange={(e) => setInput(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                              placeholder={quotedText ? "Iqtibosga javob yozing..." : "Savol yoki fikringizni yozing..."}
+                              className="flex-1 bg-white/70 backdrop-blur-sm border border-violet-200/60 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200/50 placeholder-gray-400 transition-all"
+                              disabled={isTyping}
+                            />
+                            {/* Single button: mic when empty, send when text exists */}
+                            <AnimatePresence mode="wait">
+                              {input.trim() ? (
+                                <motion.button
+                                  key="send"
+                                  initial={{ scale: 0.5, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.5, opacity: 0 }}
+                                  transition={{ duration: 0.15 }}
+                                  whileTap={{ scale: 0.88 }}
+                                  onClick={handleSendMessage}
+                                  disabled={isTyping}
+                                  className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-full hover:shadow-lg transition-all disabled:opacity-50 shadow-md shrink-0"
+                                >
+                                  <Send size={17} />
+                                </motion.button>
+                              ) : (
+                                <motion.button
+                                  key="mic"
+                                  initial={{ scale: 0.5, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.5, opacity: 0 }}
+                                  transition={{ duration: 0.15 }}
+                                  whileTap={{ scale: 0.88 }}
+                                  onClick={startRecording}
+                                  disabled={isTyping || isAnalyzingReRecord}
+                                  className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-full hover:shadow-lg transition-all disabled:opacity-50 shadow-md shrink-0"
+                                >
+                                  <Mic size={17} />
+                                </motion.button>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
