@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { X, Send, Loader2, Bot, User, Trash2, MessageSquare, BookOpen, BarChart, Mic, Square, RotateCcw } from "lucide-react";
 import localforage from "localforage";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { gemini } from "../services/gemini";
 import { SavedAnswer } from "../types";
 import { VocabularyBuilder } from "./VocabularyBuilder";
@@ -547,8 +548,8 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                                 {msg.role === "user" ? "Siz" : "AI Examiner"}
                               </span>
                             </div>
-                            <div className="text-sm prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 prose-table:text-xs">
-                              <ReactMarkdown>{msg.text}</ReactMarkdown>
+                            <div className="text-sm prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:text-xs [&_th]:bg-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-gray-100 [&_tr:nth-child(even)_td]:bg-gray-50 [&_tr:hover_td]:bg-indigo-50 [&_table]:shadow-sm">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                             </div>
                           </div>
                         </div>
@@ -643,11 +644,11 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                   </div>
                 )
               ) : activeTab === "vocab" ? (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div key="vocab" className="flex-1 overflow-y-auto p-4">
                   <VocabularyBuilder />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div key="progress" className="flex-1 overflow-y-auto p-4">
                   <ProgressDashboard />
                 </div>
               )}
