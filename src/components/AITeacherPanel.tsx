@@ -98,6 +98,10 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [reRecordedAudioUrl, setReRecordedAudioUrl] = useState<string | null>(null);
+
+  // UI state for collapsible sections
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expandedFeedback, setExpandedFeedback] = useState(true);
   const [reRecordedBlob, setReRecordedBlob] = useState<Blob | null>(null);
   const [isAnalyzingReRecord, setIsAnalyzingReRecord] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -645,7 +649,11 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
 
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3" onMouseUp={handleTextSelect}>
-                      {messages.map((msg, idx) => (
+                      {messages.map((msg, idx) => {
+                        const isAnalysis = msg.role === "model" && msg.text.includes("Natija (Score)");
+                        const isCollapsedAnalysis = isAnalysis && idx === 0 && !expandedFeedback;
+
+                        return (
                         <motion.div
                           key={idx}
                           initial={{ opacity: 0, y: 6 }}
@@ -658,8 +666,8 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                               ? "bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(109,40,217,0.3)]"
                               : "bg-white/80 backdrop-blur-sm border border-violet-100/60 text-gray-800 rounded-tl-sm shadow-[0_2px_12px_rgba(99,102,241,0.07)]"
                           }`}>
-                            {/* Message role label */}
-                            <div className={`flex items-center gap-1.5 mb-1.5 ${msg.role === "user" ? "opacity-70" : "opacity-60"}`}>
+                            {/* Message role label with collapse button for analysis */}
+                            <div className={`flex items-center gap-1.5 ${isCollapsedAnalysis ? "mb-0" : "mb-1.5"} ${msg.role === "user" ? "opacity-70" : "opacity-60"}`}>
                               {msg.role === "user" ? (
                                 <User size={11} />
                               ) : isStreaming && idx === messages.length - 1 ? (
@@ -675,23 +683,32 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                               {msg.role === "model" && isStreaming && idx === messages.length - 1 && (
                                 <span className="text-[9px] text-violet-400 font-medium animate-pulse">· yozmoqda</span>
                               )}
+                              {isAnalysis && (
+                                <button onClick={() => setExpandedFeedback(!expandedFeedback)}
+                                  className="ml-auto text-[10px] text-violet-500 hover:text-violet-700 font-bold transition-colors">
+                                  {expandedFeedback ? "▼" : "▶"} Tahlil
+                                </button>
+                              )}
                             </div>
-                            {/* Content */}
-                            <div className={`prose prose-sm max-w-none leading-relaxed
-                              prose-p:my-1 prose-p:leading-relaxed
-                              prose-pre:bg-slate-100 prose-pre:text-slate-800 prose-pre:rounded-xl prose-pre:text-xs
-                              prose-code:text-violet-600 prose-code:bg-violet-50 prose-code:px-1 prose-code:rounded
-                              [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:text-xs
-                              [&_th]:bg-gradient-to-r [&_th]:from-violet-600 [&_th]:to-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold
-                              [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-violet-50
-                              [&_tr:nth-child(even)_td]:bg-violet-50/40 [&_tr:hover_td]:bg-indigo-50/60
-                              [&_table]:shadow-sm [&_blockquote]:border-l-4 [&_blockquote]:border-violet-300 [&_blockquote]:pl-3 [&_blockquote]:text-gray-600 [&_blockquote]:italic
-                              ${msg.role === "user" ? "prose-invert [&_*]:text-white/90" : ""}`}>
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanText(msg.text)}</ReactMarkdown>
-                            </div>
+                            {/* Content — show/hide for analysis */}
+                            {!isCollapsedAnalysis && (
+                              <div className={`prose prose-sm max-w-none leading-relaxed
+                                prose-p:my-1 prose-p:leading-relaxed
+                                prose-pre:bg-slate-100 prose-pre:text-slate-800 prose-pre:rounded-xl prose-pre:text-xs
+                                prose-code:text-violet-600 prose-code:bg-violet-50 prose-code:px-1 prose-code:rounded
+                                [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:text-xs
+                                [&_th]:bg-gradient-to-r [&_th]:from-violet-600 [&_th]:to-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold
+                                [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-violet-50
+                                [&_tr:nth-child(even)_td]:bg-violet-50/40 [&_tr:hover_td]:bg-indigo-50/60
+                                [&_table]:shadow-sm [&_blockquote]:border-l-4 [&_blockquote]:border-violet-300 [&_blockquote]:pl-3 [&_blockquote]:text-gray-600 [&_blockquote]:italic
+                                ${msg.role === "user" ? "prose-invert [&_*]:text-white/90" : ""}`}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanText(msg.text)}</ReactMarkdown>
+                              </div>
+                            )}
                           </div>
                         </motion.div>
-                      ))}
+                      );
+                      })}
 
                       {/* Typing indicator */}
                       {isTyping && (
@@ -729,63 +746,67 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                       )}
                     </AnimatePresence>
 
-                    {/* Suggestion chips */}
+                    {/* Suggestion chips — collapsible dropdown */}
                     <AnimatePresence>
                       {suggestions.length > 0 && !isStreaming && !isTyping && (
-                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
-                          transition={{ duration: 0.2 }} className="px-3 pt-1.5 pb-1 flex flex-col gap-1.5">
-                          <p className="text-[9px] text-violet-400 font-semibold uppercase tracking-widest px-1">💬 Savol bering:</p>
-                          {suggestions.map((s, i) => (
-                            <motion.button key={i} whileTap={{ scale: 0.97 }} onClick={() => setInput(s)}
-                              className="text-left text-xs text-violet-700 bg-violet-50/80 backdrop-blur-sm border border-violet-100/80 rounded-xl px-3 py-2 hover:bg-violet-100/80 hover:border-violet-200 transition-all shadow-sm">
-                              {s}
-                            </motion.button>
-                          ))}
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }} className="px-3 overflow-hidden">
+                          <button onClick={() => setShowSuggestions(!showSuggestions)}
+                            className="w-full text-left flex items-center gap-2 py-1.5 text-[10px] font-semibold text-violet-600 hover:text-violet-700 transition-colors">
+                            <span className={`transition-transform duration-200 ${showSuggestions ? "rotate-90" : ""}`}>▶</span>
+                            <span>💬 Tayyor savollari ({suggestions.length})</span>
+                          </button>
+                          <AnimatePresence>
+                            {showSuggestions && (
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.15 }} className="flex flex-col gap-1.5 pb-2 overflow-hidden">
+                                {suggestions.map((s, i) => (
+                                  <motion.button key={i} whileTap={{ scale: 0.97 }} onClick={() => { setInput(s); setShowSuggestions(false); }}
+                                    className="text-left text-xs text-violet-700 bg-violet-50/80 backdrop-blur-sm border border-violet-100/80 rounded-xl px-3 py-2 hover:bg-violet-100/80 hover:border-violet-200 transition-all shadow-sm">
+                                    {s}
+                                  </motion.button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </motion.div>
                       )}
                     </AnimatePresence>
 
-                    {/* Re-record section */}
-                    <div className="px-3 pt-2 pb-1 shrink-0">
-                      {!isRecording && !reRecordedAudioUrl && (
-                        <button onClick={startRecording} disabled={isTyping || isAnalyzingReRecord}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50/80 backdrop-blur-sm text-rose-500 border border-rose-200/60 rounded-2xl hover:bg-rose-100/80 transition-all text-sm font-medium disabled:opacity-50 shadow-sm">
-                          <Mic size={15} />
-                          Qayta yozdirish (Re-record)
-                        </button>
-                      )}
-                      {isRecording && (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 flex items-center gap-2.5 bg-rose-50/80 border border-rose-200/60 rounded-2xl px-4 py-2.5">
-                            <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.6)]" />
-                            <span className="text-rose-700 font-mono text-sm font-bold">{formatTime(recordingTime)}</span>
-                            <span className="text-rose-400 text-xs">yozilmoqda...</span>
-                          </div>
-                          <button onClick={stopRecording} className="bg-gradient-to-br from-rose-500 to-red-600 text-white p-3 rounded-2xl shadow-md hover:shadow-lg transition-all">
-                            <Square size={15} fill="white" />
-                          </button>
-                        </div>
-                      )}
-                      {reRecordedAudioUrl && !isRecording && (
-                        <div className="flex flex-col gap-2">
-                          <audio controls src={reRecordedAudioUrl} className="w-full h-8 rounded-xl" />
-                          <div className="flex gap-2">
+                    {/* Re-recorded audio player — compact */}
+                    {reRecordedAudioUrl && !isRecording && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                        className="px-3 pt-1.5 pb-0.5 shrink-0">
+                        <div className="flex flex-col gap-1.5">
+                          <audio controls src={reRecordedAudioUrl} className="w-full h-7 rounded-xl text-xs" />
+                          <div className="flex gap-1.5">
                             <button onClick={() => { if (reRecordedAudioUrl) URL.revokeObjectURL(reRecordedAudioUrl); setReRecordedAudioUrl(null); setReRecordedBlob(null); }}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100/80 text-gray-600 rounded-2xl hover:bg-gray-200/80 transition-colors text-sm font-medium">
-                              <RotateCcw size={13} /> Qayta
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-gray-100/80 text-gray-600 rounded-lg hover:bg-gray-200/80 transition-colors text-xs font-medium">
+                              <RotateCcw size={12} /> Qayta
                             </button>
                             <button onClick={handleReRecordAnalysis} disabled={isAnalyzingReRecord || isTyping}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-2xl hover:shadow-lg transition-all text-sm font-medium disabled:opacity-50 shadow-md">
-                              {isAnalyzingReRecord ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all text-xs font-medium disabled:opacity-50">
+                              {isAnalyzingReRecord ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                               Tahlil
                             </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </motion.div>
+                    )}
 
-                    {/* Text input */}
+                    {/* Text input with integrated microphone */}
                     <div className="px-3 pb-3 pt-1.5 bg-white/60 backdrop-blur-sm border-t border-violet-100/40 shrink-0">
+                      {isRecording && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-2 mb-2 px-3 py-2 bg-rose-50/80 border border-rose-200/60 rounded-xl">
+                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.2, repeat: Infinity }}
+                            className="w-2.5 h-2.5 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                          <span className="text-rose-700 font-mono text-sm font-bold flex-1">{formatTime(recordingTime)}</span>
+                          <button onClick={stopRecording} className="text-rose-600 hover:text-rose-700 transition-colors">
+                            <Square size={14} fill="currentColor" />
+                          </button>
+                        </motion.div>
+                      )}
                       <div className="flex gap-2 items-center">
                         <input
                           type="text"
@@ -794,12 +815,37 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
                           placeholder={quotedText ? "Iqtibosga javob yozing..." : "Savol yoki fikringizni yozing..."}
                           className="flex-1 bg-white/70 backdrop-blur-sm border border-violet-200/60 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200/50 placeholder-gray-400 transition-all"
-                          disabled={isTyping}
+                          disabled={isTyping || isRecording}
                         />
+                        {/* Microphone button — bottom right */}
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={isTyping || isAnalyzingReRecord}
+                          className="relative shrink-0"
+                        >
+                          <div className={`relative p-2.5 rounded-2xl transition-all ${
+                            isRecording
+                              ? "bg-rose-500 text-white shadow-lg"
+                              : "bg-rose-50/80 text-rose-500 border border-rose-200/60 hover:bg-rose-100/80"
+                          }`}>
+                            <Mic size={17} />
+                          </div>
+                          {/* Recording indicator circle */}
+                          {isRecording && (
+                            <>
+                              <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.8, 0.2, 0.8] }} transition={{ duration: 1.2, repeat: Infinity }}
+                                className="absolute inset-0 rounded-2xl border-2 border-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                              <motion.div animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }} transition={{ duration: 1.2, repeat: Infinity }}
+                                className="absolute inset-0 rounded-2xl border border-rose-500/50" />
+                            </>
+                          )}
+                        </motion.button>
+                        {/* Send button */}
                         <motion.button
                           whileTap={{ scale: 0.92 }}
                           onClick={handleSendMessage}
-                          disabled={isTyping || !input.trim()}
+                          disabled={isTyping || !input.trim() || isRecording}
                           className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 shadow-md shrink-0"
                         >
                           <Send size={17} />
