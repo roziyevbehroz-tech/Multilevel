@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronRight, ChevronLeft, Play, FileText, Clock, Trash2, Bot, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, Play, FileText, Clock, Trash2, GraduationCap, Sparkles } from "lucide-react";
 import localforage from "localforage";
 import { SavedAnswer } from "../types";
-import ReactMarkdown from "react-markdown";
-import { gemini } from "../services/gemini";
 
 interface HistorySidebarProps {
   refreshTrigger: number;
@@ -15,15 +13,33 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
   const [isOpen, setIsOpen] = useState(false);
   const [savedAnswers, setSavedAnswers] = useState<SavedAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<SavedAnswer | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadSavedAnswers();
   }, [refreshTrigger, isOpen]);
 
+  // Outside click → close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (sidebarRef.current && !sidebarRef.current.contains(target)) {
+        setIsOpen(false);
+      }
+    };
+    // Small delay so the toggle button click doesn't immediately close
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [isOpen]);
+
   const loadSavedAnswers = async () => {
     try {
-      // Revoke old object URLs to prevent memory leaks
       savedAnswers.forEach(a => {
         if (a.audioUrl) URL.revokeObjectURL(a.audioUrl);
       });
@@ -39,8 +55,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
       });
       answers.sort((a, b) => b.timestamp - a.timestamp);
       setSavedAnswers(answers);
-      
-      // Update selected answer if it was modified
+
       if (selectedAnswer) {
         const updated = answers.find(a => a.id === selectedAnswer.id);
         if (updated) setSelectedAnswer(updated);
@@ -54,195 +69,171 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ refreshTrigger, 
     e.stopPropagation();
     try {
       await localforage.removeItem(id);
-      if (selectedAnswer?.id === id) {
-        setSelectedAnswer(null);
-      }
+      if (selectedAnswer?.id === id) setSelectedAnswer(null);
       loadSavedAnswers();
     } catch (err) {
       console.error("Error deleting answer:", err);
     }
   };
 
-  const handleAnalyze = async (answer: SavedAnswer) => {
-    setIsAnalyzing(true);
-    try {
-      if (answer.part === "Full Mock Feedback" && answer.sessionId) {
-        // Fetch all answers for this session
-        const sessionAnswers: SavedAnswer[] = [];
-        await localforage.iterate((value: SavedAnswer, key: string) => {
-          if (value.sessionId === answer.sessionId && value.id !== answer.id) {
-            sessionAnswers.push(value);
-          }
-        });
-        
-        // We can't easily send 8 audio files in one go without hitting limits or timeout.
-        // So we'll just ask Gemini to give a general feedback based on the fact that they finished.
-        // Ideally, we would send transcripts, but they might not be generated yet.
-        const context = `Foydalanuvchi to'liq Multi-level Speaking Mock testini (Qism 1.1, 1.2, 2 va 3) yakunladi. 
-        Unga umumiy xulosa, motivatsiya va kelgusi tayyorgarlik uchun strategik maslahatlar ber. 
-        Javobingni o'zbek tilida, do'stona va ruhlantiruvchi ohangda yoz.`;
-        
-        const response = await gemini.generateText(context);
-        const analysisText = response.text || "Tahlil qilib bo'lmadi.";
-        
-        const updatedAnswer = { ...answer, analysis: analysisText };
-        await localforage.setItem(answer.id, updatedAnswer);
-        loadSavedAnswers();
-        return;
-      }
-
-      if (!answer.audioBlob) throw new Error("Audio mavjud emas");
-
-      const reader = new FileReader();
-      reader.readAsDataURL(answer.audioBlob);
-      await new Promise((resolve) => {
-        reader.onloadend = () => resolve(null);
-      });
-      
-      const audioBase64 = (reader.result as string).split(",")[1];
-      const context = `Foydalanuvchi quyidagi savolga javob bergan: "${answer.questionText}" (${answer.part}). Iltimos, uning javobini tahlil qilib ber.
-      Tahlilda quyidagi jihatlarga alohida e'tibor qarat:
-      1. Pronunciation (talaffuz) - accent va enunciation (aniq talaffuz) bo'yicha baho ber (1-10 ball).
-      2. Xatolarni aniq ko'rsat va ularni qanday to'g'rilashni tushuntir.
-      3. Umumiy tavsiyalar ber.
-      4. Ushbu savol uchun yuqori ball oladigan 'model answer' (namunaviy javob) yozib ber va foydalanuvchining javobi bilan solishtirib, lug'at va grammatika bo'yicha farqlarni jadval ko'rinishida ko'rsat.`;
-      
-      const audioMime = answer.audioBlob.type || "audio/webm";
-      const response = await gemini.analyzeAudio(audioBase64, audioMime, context);
-      const analysisText = response.text || "Tahlil qilib bo'lmadi.";
-      
-      // Update in localforage
-      const updatedAnswer = { ...answer, analysis: analysisText };
-      await localforage.setItem(answer.id, updatedAnswer);
-      
-      // Reload to reflect changes
-      loadSavedAnswers();
-    } catch (err: any) {
-      console.error("Analysis error:", err);
-      const errorMsg = err?.message || String(err);
-      const isQuota = errorMsg.includes("quota") || errorMsg.includes("kvota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("429");
-      alert(isQuota
-        ? "API kvota limiti tugagan. Iltimos 1-2 daqiqa kutib qayta urinib ko'ring."
-        : `Tahlil qilishda xatolik: ${errorMsg}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp);
+    const date = d.toLocaleDateString("uz-UZ", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    const time = d.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+    return { date, time };
   };
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-200 shadow-md px-2 py-3 rounded-r-xl transition-all duration-300 flex flex-col items-center gap-1 ${
-          isOpen ? "left-[320px]" : "left-0"
-        }`}
-      >
-        <FileText size={18} className="text-indigo-600" />
-        {!isOpen && <span className="text-[9px] font-bold text-gray-500 writing-mode-vertical" style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>Tarix</span>}
-        {isOpen ? <ChevronLeft size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
-      </button>
+      {/* Backdrop overlay — closes on outside click, sits below panel */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="history-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[59] bg-black/20 backdrop-blur-[2px]"
+            onMouseDown={() => setIsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar */}
-      <div
-        className={`fixed top-0 left-0 h-full bg-white shadow-xl border-r border-gray-200 z-30 transition-all duration-300 flex flex-col ${
-          isOpen ? "w-[320px] translate-x-0" : "w-[320px] -translate-x-full"
-        }`}
-      >
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2">
-            <Clock size={18} className="text-indigo-600" />
-            Javoblar Tarixi
-          </h2>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {savedAnswers.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center mt-10">Hali javoblar saqlanmagan.</p>
-          ) : (
-            savedAnswers.map((answer) => (
-              <div key={answer.id} className="flex flex-col gap-2">
-                <div
-                  onClick={() => setSelectedAnswer(selectedAnswer?.id === answer.id ? null : answer)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedAnswer?.id === answer.id ? "bg-indigo-50 border-indigo-200" : "bg-white border-gray-200 hover:border-indigo-300"
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded">
-                      {answer.part}
-                    </span>
-                    <button
-                      onClick={(e) => handleDeleteAnswer(answer.id, e)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-800 font-medium line-clamp-2">{answer.questionText}</p>
-                </div>
-
-                {/* Expanded Details */}
-                <AnimatePresence>
-                  {selectedAnswer?.id === answer.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm space-y-3">
-                        <div>
-                          {answer.audioUrl && (
-                            <>
-                              <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
-                                <Play size={12} /> Audio
-                              </p>
-                              <audio src={answer.audioUrl} controls className="w-full h-8" />
-                            </>
-                          )}
-                        </div>
-                        
-                        <div className="pt-2 border-t border-gray-200">
-                          {answer.analysis ? (
-                            <div className="mt-2 prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 text-xs">
-                              <ReactMarkdown>{answer.analysis}</ReactMarkdown>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAnalyze(answer);
-                              }}
-                              disabled={isAnalyzing}
-                              className="w-full flex items-center justify-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-2 rounded-md transition-colors text-xs font-bold disabled:opacity-50"
-                            >
-                              {isAnalyzing && selectedAnswer?.id === answer.id ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <FileText size={14} />
-                              )}
-                              Transcript va Tahlilni ko'rish
-                            </button>
-                          )}
-                        </div>
-                        
-                        <div className="pt-2 border-t border-gray-200">
-                          <button
-                            onClick={() => onOpenAITeacher(answer)}
-                            className="w-full flex items-center justify-center gap-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 py-2 rounded-md transition-colors text-xs font-bold"
-                          >
-                            <Bot size={14} />
-                            AI Teacher bilan muhokama
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))
+      {/* Sidebar panel + toggle button wrapped together for outside-click ref */}
+      <div ref={sidebarRef}>
+        {/* Toggle Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`fixed top-1/2 -translate-y-1/2 z-[61] bg-white/90 backdrop-blur-md border border-indigo-100 shadow-lg px-2 py-3 rounded-r-xl transition-all duration-300 flex flex-col items-center gap-1 hover:bg-indigo-50 ${
+            isOpen ? "left-[320px]" : "left-0"
+          }`}
+        >
+          <FileText size={18} className="text-indigo-600" />
+          {!isOpen && (
+            <span
+              className="text-[9px] font-bold text-gray-500"
+              style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+            >
+              Tarix
+            </span>
           )}
+          {isOpen ? <ChevronLeft size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+        </button>
+
+        {/* Sidebar */}
+        <div
+          className={`fixed top-0 left-0 h-full bg-white/95 backdrop-blur-2xl shadow-[0_0_60px_rgba(99,102,241,0.2)] border-r border-indigo-100/60 z-[60] transition-all duration-300 flex flex-col ${
+            isOpen ? "w-[320px] translate-x-0" : "w-[320px] -translate-x-full"
+          }`}
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-indigo-100/60 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 flex-shrink-0">
+            <h2 className="font-bold text-white flex items-center gap-2">
+              <Clock size={18} className="text-indigo-200" />
+              Javoblar Tarixi
+              <span className="ml-auto text-xs text-indigo-200 font-normal">{savedAnswers.length} ta</span>
+            </h2>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {savedAnswers.length === 0 ? (
+              <div className="text-center mt-16 px-4">
+                <FileText size={32} className="mx-auto text-gray-200 mb-3" />
+                <p className="text-sm text-gray-400">Hali javoblar saqlanmagan.</p>
+              </div>
+            ) : (
+              savedAnswers.map((answer) => {
+                const { date, time } = formatDate(answer.timestamp);
+                const isSelected = selectedAnswer?.id === answer.id;
+                return (
+                  <div key={answer.id}>
+                    {/* List item — date, time, part only */}
+                    <div
+                      onClick={() => setSelectedAnswer(isSelected ? null : answer)}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-indigo-50 border-indigo-200 shadow-sm"
+                          : "bg-white border-gray-100 hover:border-indigo-200 hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">
+                          {answer.part}
+                        </span>
+                        <button
+                          onClick={(e) => handleDeleteAnswer(answer.id, e)}
+                          className="text-gray-300 hover:text-red-400 transition-colors p-0.5 rounded"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Clock size={10} className="text-gray-300 shrink-0" />
+                        <span className="text-[11px] text-gray-500">{date}</span>
+                        <span className="text-[11px] text-gray-400">{time}</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-1">{answer.questionText}</p>
+                    </div>
+
+                    {/* Expanded detail — transcript + AI Tutor button */}
+                    <AnimatePresence>
+                      {isSelected && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-1.5 p-3 bg-gray-50/80 rounded-xl border border-gray-100 space-y-3">
+                            {/* Audio */}
+                            {answer.audioUrl && (
+                              <div>
+                                <p className="text-[10px] font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                                  <Play size={10} /> Audio yozuv
+                                </p>
+                                <audio src={answer.audioUrl} controls className="w-full h-8" />
+                              </div>
+                            )}
+
+                            {/* Transcript */}
+                            {answer.transcript ? (
+                              <div>
+                                <p className="text-[10px] font-semibold text-gray-400 mb-1 flex items-center gap-1">
+                                  <FileText size={10} /> Transcript
+                                </p>
+                                <p className="text-xs text-gray-700 leading-relaxed bg-white rounded-lg p-2 border border-gray-100">
+                                  {answer.transcript}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic text-center py-1">
+                                Transcript mavjud emas
+                              </p>
+                            )}
+
+                            {/* AI Tutor button */}
+                            <button
+                              onClick={() => {
+                                onOpenAITeacher(answer);
+                                setIsOpen(false);
+                              }}
+                              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white py-2.5 rounded-xl transition-all text-xs font-bold shadow-sm hover:shadow-md"
+                            >
+                              <GraduationCap size={14} />
+                              AI Tutor bilan tahlil
+                              <Sparkles size={11} className="text-yellow-200" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </>
