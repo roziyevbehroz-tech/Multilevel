@@ -84,6 +84,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Re-recording state
@@ -116,6 +117,26 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Parse suggestions from last AI message when streaming ends
+  useEffect(() => {
+    if (!isStreaming && messages.length > 0) {
+      const lastModel = [...messages].reverse().find(m => m.role === "model");
+      if (lastModel) {
+        const match = lastModel.text.match(/\[SUGGEST_START\]([\s\S]*?)\[SUGGEST_END\]/);
+        if (match) {
+          try {
+            const data = JSON.parse(match[1].trim());
+            setSuggestions(data.suggestions || []);
+          } catch {
+            setSuggestions([]);
+          }
+        } else {
+          setSuggestions([]);
+        }
+      }
+    }
+  }, [isStreaming, messages]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -317,6 +338,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
     const userMessage = input.trim();
     setMessages(prev => [...prev, { role: "user", text: userMessage }]);
     setInput("");
+    setSuggestions([]);
     setIsTyping(true);
 
     try {
@@ -606,7 +628,13 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                               )}
                             </div>
                             <div className="text-sm prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:text-xs [&_th]:bg-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-gray-100 [&_tr:nth-child(even)_td]:bg-gray-50 [&_tr:hover_td]:bg-indigo-50 [&_table]:shadow-sm">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {msg.text
+                                  .replace(/\[VOCAB_START\][\s\S]*?\[VOCAB_END\]/g, "")
+                                  .replace(/\[PROGRESS_START\][\s\S]*?\[PROGRESS_END\]/g, "")
+                                  .replace(/\[SUGGEST_START\][\s\S]*?\[SUGGEST_END\]/g, "")
+                                  .trim()}
+                              </ReactMarkdown>
                             </div>
                           </div>
                         </div>
@@ -639,6 +667,30 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                       )}
                       <div ref={messagesEndRef} />
                     </div>
+
+                    {/* Quick reply suggestion chips */}
+                    <AnimatePresence>
+                      {suggestions.length > 0 && !isStreaming && !isTyping && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 8 }}
+                          transition={{ duration: 0.25 }}
+                          className="px-4 pt-2 pb-1 flex flex-col gap-1.5"
+                        >
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">💬 Savol bering:</p>
+                          {suggestions.map((s, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setInput(s)}
+                              className="text-left text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 hover:bg-indigo-100 active:scale-95 transition-all"
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Re-record section */}
                     <div className="bg-gradient-to-t from-gray-100 to-transparent px-4 pt-2 pb-0">
