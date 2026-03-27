@@ -43,7 +43,7 @@ FEEDBACK FORMAT (qat'iy bajaring):
 [PROGRESS_END]
 
 [SUGGEST_START]
-{"suggestions": ["[Mavzuga oid tabiiy savol 1 — o'zbek tilida]", "[Tabiiy savol 2]", "[Tabiiy savol 3]"]}
+{"suggestions": ["[User AI tutorga beradigan savol 1 — tahlil yoki feedbackni chuqurroq tushunish uchun, o'zbek tilida. Masalan: 'Bu xatoni qanday tuzatishim mumkin?', 'Model answerda ishlatilgan grammatikani tushuntiring', 'Yana qanday so'zlar ishlatishim mumkin edi?']", "[Savol 2]", "[Savol 3]"]}
 [SUGGEST_END]`;
 
 

@@ -771,7 +771,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                           <button onClick={() => setShowSuggestions(!showSuggestions)}
                             className="w-full text-left flex items-center gap-2 py-1.5 text-[10px] font-semibold text-violet-600 hover:text-violet-700 transition-colors">
                             <span className={`transition-transform duration-200 ${showSuggestions ? "rotate-90" : ""}`}>▶</span>
-                            <span>💬 Tayyor savollari ({suggestions.length})</span>
+                            <span>💬 AI Tutorga savol bering ({suggestions.length})</span>
                           </button>
                           <AnimatePresence>
                             {showSuggestions && (
