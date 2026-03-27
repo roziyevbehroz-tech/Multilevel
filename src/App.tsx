@@ -459,6 +459,7 @@ const LessonLabAssistant: React.FC = () => {
     if (isPrepTime && prepTimeLeft !== null && prepTimeLeft <= 0) {
       setIsPrepTime(false);
       setPrepTimeLeft(null);
+      playBeep("start");
       startLiveSessionRef.current();
     }
   }, [isPrepTime, prepTimeLeft]);
@@ -477,6 +478,7 @@ const LessonLabAssistant: React.FC = () => {
   useEffect(() => {
     if (isLive && timeLeft !== null && timeLeft <= 0 && !autoStopFiredRef.current) {
       autoStopFiredRef.current = true;
+      playBeep("end");
       stopLiveSessionRef.current(true);
     }
     if (!isLive) {
@@ -724,6 +726,33 @@ const LessonLabAssistant: React.FC = () => {
     setSession(null);
     setTimeLeft(null);
     setVisualizerData(new Uint8Array(0));
+  };
+
+  // ── Beep sounds via Web Audio API ─────────────────────────────────────
+  const playBeep = (type: "start" | "end") => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const schedule = type === "start"
+        ? [{ freq: 880, t: 0 }, { freq: 1100, t: 0.18 }]   // ascending "ding-ding"
+        : [{ freq: 880, t: 0 }, { freq: 660, t: 0.2 }];    // descending "dong-dong"
+
+      schedule.forEach(({ freq, t }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
+        gain.gain.setValueAtTime(0, ctx.currentTime + t);
+        gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.32);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.35);
+      });
+      setTimeout(() => ctx.close(), 1200);
+    } catch (e) {
+      console.warn("Beep failed:", e);
+    }
   };
 
   // Keep function refs updated every render (avoids stale closures in useEffects)
@@ -1733,6 +1762,7 @@ AGAINST3: [argument against]`,
                       onClick={() => {
                         setIsPrepTime(false);
                         setPrepTimeLeft(null);
+                        playBeep("start");
                         startLiveSession();
                       }}
                       className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-colors shadow-lg"
