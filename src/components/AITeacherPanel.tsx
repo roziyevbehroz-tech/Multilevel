@@ -234,17 +234,25 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       }
 
       const audioMime = audioBlob.type || "audio/webm";
-      const response = await gemini.analyzeAudio(audioBase64, audioMime, context);
-      const responseText = response.text || "Kechirasiz, tahlil qila olmadim. Iltimos qayta urinib ko'ring.";
 
-      if (isReRecord) {
-        setMessages(prev => [...prev, {
-          role: "model",
-          text: `🔄 **Yangi javobingiz tahlili:**\n\n${responseText}`
-        }]);
-      } else {
-        setMessages(prev => [...prev, { role: "model", text: responseText }]);
+      // Add empty placeholder — streaming will fill it
+      const prefix = isReRecord ? "🔄 **Yangi javobingiz tahlili:**\n\n" : "";
+      setMessages(prev => [...prev, { role: "model", text: prefix }]);
+      setIsTyping(false);
 
+      let fullResponseText = prefix;
+      const response = await gemini.analyzeAudio(audioBase64, audioMime, context, (chunk) => {
+        fullResponseText += chunk;
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "model", text: fullResponseText };
+          return updated;
+        });
+      });
+
+      const responseText = response.text || fullResponseText || "Kechirasiz, tahlil qila olmadim. Iltimos qayta urinib ko'ring.";
+
+      if (!isReRecord) {
         // Save analysis
         const updatedAnswer = { ...answer, analysis: responseText };
         await localforage.setItem(answer.id, updatedAnswer);
@@ -312,10 +320,20 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
       }
 
       const chatHistory = messages.map(m => ({ role: m.role, text: m.text }));
-      const response = await gemini.chat(chatHistory, userMessage, context);
-      const responseText = response.text || "Kechirasiz, javob bera olmadim.";
 
-      setMessages(prev => [...prev, { role: "model", text: responseText }]);
+      // Add empty placeholder for streaming
+      setMessages(prev => [...prev, { role: "model", text: "" }]);
+      setIsTyping(false);
+
+      let streamedText = "";
+      await gemini.chat(chatHistory, userMessage, context, (chunk) => {
+        streamedText += chunk;
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "model", text: streamedText };
+          return updated;
+        });
+      });
     } catch (err) {
       console.error("Chat error:", err);
       setMessages(prev => [...prev, {
