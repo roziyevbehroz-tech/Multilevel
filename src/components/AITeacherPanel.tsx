@@ -102,6 +102,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   // UI state for collapsible sections
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandedFeedback, setExpandedFeedback] = useState(true);
+  const [expandedAudioBar, setExpandedAudioBar] = useState(true);
   const [reRecordedBlob, setReRecordedBlob] = useState<Blob | null>(null);
   const [isAnalyzingReRecord, setIsAnalyzingReRecord] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -201,6 +202,8 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
     setSelectedAnswer(answer);
     setReRecordedAudioUrl(null);
     setReRecordedBlob(null);
+    setExpandedAudioBar(true);
+    setExpandedFeedback(true);
     analysisTriggeredRef.current = null;
 
     if (answer.analysis) {
@@ -631,9 +634,17 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                     {/* Selected answer header */}
                     <div className="bg-white/70 backdrop-blur-sm px-4 py-3 border-b border-violet-100/50 shrink-0">
                       <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
-                          {selectedAnswer.part}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
+                            {selectedAnswer.part}
+                          </span>
+                          {selectedAnswer.audioUrl && (
+                            <button onClick={() => setExpandedAudioBar(!expandedAudioBar)}
+                              className="text-violet-500 hover:text-violet-700 transition-colors p-1">
+                              <span className={`text-sm transition-transform duration-200 ${expandedAudioBar ? "" : "rotate-90"}`}>▼</span>
+                            </button>
+                          )}
+                        </div>
                         <button
                           onClick={() => { setSelectedAnswer(null); setMessages([]); setReRecordedAudioUrl(null); setReRecordedBlob(null); stopRecording(); setQuotedText(""); }}
                           className="text-[11px] text-violet-500 hover:text-violet-700 font-medium transition-colors"
@@ -642,9 +653,15 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                         </button>
                       </div>
                       <p className="text-sm text-gray-800 font-medium leading-snug">{selectedAnswer.questionText}</p>
-                      {selectedAnswer.audioUrl && (
-                        <audio controls src={selectedAnswer.audioUrl} className="w-full h-8 mt-2 rounded-xl" />
-                      )}
+                      {/* Collapsible audio bar with smooth animation */}
+                      <AnimatePresence>
+                        {selectedAnswer.audioUrl && expandedAudioBar && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }} className="mt-2">
+                            <audio controls src={selectedAnswer.audioUrl} className="w-full h-8 rounded-xl" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Messages */}
