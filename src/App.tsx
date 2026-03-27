@@ -89,7 +89,7 @@ const PRACTICE_BANK: Record<string, { description: string; level: string; sets: 
         id: "p2.set1", title: "Muhim qaror",
         questions: [{
           id: "p2.1", part: "Qism 2", text: "Look at the photograph and answer the following questions.", timeLimit: 120, prepTime: 60,
-          imageUrls: ["https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80&w=800"],
+          imageUrls: ["https://images.unsplash.com/photo-1556388158-158ea5ccacbd?auto=format&fit=crop&q=80&w=800"],
           subQuestions: ["Tell me about a critical decision you have made.", "How has this decision influenced you and your life?", "What factors have the highest impact on the decisions people make?"],
         }],
       },
@@ -1393,7 +1393,7 @@ AGAINST3: [argument against]`,
       )}
 
       {examMode === "mock_running" && (
-        <main className="max-w-5xl mx-auto px-6 mt-8">
+        <main className="max-w-5xl mx-auto px-3 md:px-6 mt-4 md:mt-8">
           {showMockIntro ? (
             /* ═══ MOCK INTRO — Full exam overview ═══ */
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -1479,53 +1479,67 @@ AGAINST3: [argument against]`,
             </div>
           ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
-              <div className="font-bold text-[#1E293B] uppercase">
-                {activeMockQuestions[currentQuestionIndex].part}
-                <span className="text-xs text-gray-400 ml-2 normal-case">
-                  ({activeMockQuestions[currentQuestionIndex].part === "Qism 1.1" ? "A1-A2" :
-                    activeMockQuestions[currentQuestionIndex].part === "Qism 1.2" ? "B1" :
-                    activeMockQuestions[currentQuestionIndex].part === "Qism 2" ? "B2" : "C1"})
-                </span>
+            <div className="p-3 md:p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-bold text-sm text-[#1E293B] uppercase shrink-0">
+                  {activeMockQuestions[currentQuestionIndex].part}
+                  <span className="text-[10px] text-gray-400 ml-1 normal-case">
+                    ({activeMockQuestions[currentQuestionIndex].part === "Qism 1.1" ? "A1-A2" :
+                      activeMockQuestions[currentQuestionIndex].part === "Qism 1.2" ? "B1" :
+                      activeMockQuestions[currentQuestionIndex].part === "Qism 2" ? "B2" : "C1"})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-xs font-bold text-indigo-600 whitespace-nowrap">
+                    {currentQuestionIndex + 1}/{activeMockQuestions.length}
+                  </div>
+                  <div className="hidden sm:flex gap-1">
+                    {activeMockQuestions.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          i < currentQuestionIndex ? "bg-green-500" :
+                          i === currentQuestionIndex ? "bg-indigo-600" : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Examni tugatmoqchimisiz? Barcha javoblaringiz saqlanadi.")) {
+                        isSwitchingModeRef.current = true;
+                        stopLiveSession();
+                        setIsPrepTime(false);
+                        setPrepTimeLeft(null);
+                        setIsBreakTime(false);
+                        setBreakTimeLeft(null);
+                        setExamMode("mock_finished");
+                        setIsContinuousMockRunning(false);
+                      }
+                    }}
+                    className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-colors"
+                  >
+                    <LogOut size={12} />
+                    <span className="hidden sm:inline">Tugatish</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-bold text-indigo-600">
-                  Savol {currentQuestionIndex + 1} / {activeMockQuestions.length}
-                </div>
-                <div className="flex gap-1">
-                  {activeMockQuestions.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${
-                        i < currentQuestionIndex ? "bg-green-500" :
-                        i === currentQuestionIndex ? "bg-indigo-600" : "bg-gray-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <button
-                  onClick={() => {
-                    if (window.confirm("Examni tugatmoqchimisiz? Barcha javoblaringiz saqlanadi.")) {
-                      isSwitchingModeRef.current = true;
-                      stopLiveSession();
-                      setIsPrepTime(false);
-                      setPrepTimeLeft(null);
-                      setIsBreakTime(false);
-                      setBreakTimeLeft(null);
-                      setExamMode("mock_finished");
-                      setIsContinuousMockRunning(false);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
-                >
-                  <LogOut size={14} />
-                  Tugatish
-                </button>
+              {/* Mobile progress bar */}
+              <div className="flex gap-0.5 mt-2 sm:hidden">
+                {activeMockQuestions.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full ${
+                      i < currentQuestionIndex ? "bg-green-500" :
+                      i === currentQuestionIndex ? "bg-indigo-600" : "bg-gray-200"
+                    }`}
+                  />
+                ))}
               </div>
             </div>
             <div className="h-1 w-full bg-[#E87722]"></div>
 
-            <div className="p-8 md:p-12 flex flex-col items-center">
+            <div className="p-4 md:p-8 flex flex-col items-center">
                 <motion.div
                   key={`q-${transitionKey}`}
                   initial={{ opacity: 0, x: 40 }}
@@ -1534,23 +1548,23 @@ AGAINST3: [argument against]`,
                   className="flex flex-col items-center w-full"
                 >
                   {activeMockQuestions[currentQuestionIndex].imageUrls && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 w-full max-w-2xl">
+                    <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4 md:mb-8 w-full max-w-2xl">
                       {activeMockQuestions[currentQuestionIndex].imageUrls?.map((url, index) => (
-                        <ExamImage key={`${url}-${index}`} src={url} alt={`Exam prompt ${index + 1}`} className="h-64 shadow-md" />
+                        <ExamImage key={`${url}-${index}`} src={url} alt={`Exam prompt ${index + 1}`} className="h-36 md:h-56 shadow-md" />
                       ))}
                     </div>
                   )}
 
-                  <div className="text-[#1E293B] font-bold text-xl md:text-2xl mb-6 text-center max-w-3xl whitespace-pre-line">
+                  <div className="text-[#1E293B] font-bold text-lg md:text-2xl mb-4 md:mb-6 text-center max-w-3xl whitespace-pre-line">
                     {activeMockQuestions[currentQuestionIndex].text}
                   </div>
 
                   {/* Sub-questions for Qism 2 */}
                   {activeMockQuestions[currentQuestionIndex].subQuestions && (
-                    <div className="w-full max-w-3xl mb-12">
-                      <ul className="space-y-4 text-left">
+                    <div className="w-full max-w-3xl mb-6 md:mb-12">
+                      <ul className="space-y-2 md:space-y-4 text-left">
                         {activeMockQuestions[currentQuestionIndex].subQuestions?.map((q, i) => (
-                          <li key={i} className="flex gap-3 text-lg text-gray-800 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                          <li key={i} className="flex gap-2 md:gap-3 text-sm md:text-lg text-gray-800 bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200">
                             <span className="font-bold text-indigo-600 shrink-0">{i + 1}.</span>
                             <span>{q}</span>
                           </li>
@@ -1560,10 +1574,10 @@ AGAINST3: [argument against]`,
                   )}
 
                   {activeMockQuestions[currentQuestionIndex].part3Data && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-12 text-left">
-                      <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                        <h4 className="font-bold text-green-800 mb-3">FOR</h4>
-                        <ul className="list-disc pl-5 space-y-2 text-green-900">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 w-full max-w-4xl mb-6 md:mb-12 text-left">
+                      <div className="bg-green-50 p-4 md:p-6 rounded-xl border border-green-200">
+                        <h4 className="font-bold text-green-800 mb-2 text-sm md:text-base">FOR</h4>
+                        <ul className="list-disc pl-4 space-y-1.5 text-green-900 text-sm md:text-base">
                           {activeMockQuestions[currentQuestionIndex].part3Data?.for.map(
                             (point, i) => (
                               <li key={i}>{point}</li>
@@ -1571,9 +1585,9 @@ AGAINST3: [argument against]`,
                           )}
                         </ul>
                       </div>
-                      <div className="bg-red-50 p-6 rounded-xl border border-red-200">
-                        <h4 className="font-bold text-red-800 mb-3">AGAINST</h4>
-                        <ul className="list-disc pl-5 space-y-2 text-red-900">
+                      <div className="bg-red-50 p-4 md:p-6 rounded-xl border border-red-200">
+                        <h4 className="font-bold text-red-800 mb-2 text-sm md:text-base">AGAINST</h4>
+                        <ul className="list-disc pl-4 space-y-1.5 text-red-900 text-sm md:text-base">
                           {activeMockQuestions[currentQuestionIndex].part3Data?.against.map(
                             (point, i) => (
                               <li key={i}>{point}</li>
@@ -1840,10 +1854,10 @@ export default function App() {
 const ExamImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const maxRetries = 5;
 
   // Add cache-buster on retry to bypass cached failed response
-  const imgSrc = retryCount > 0 ? `${src}${src.includes("?") ? "&" : "?"}retry=${retryCount}` : src;
+  const imgSrc = retryCount > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retryCount}-${Date.now()}` : src;
 
   useEffect(() => {
     setStatus("loading");
@@ -1851,24 +1865,22 @@ const ExamImage: React.FC<{ src: string; alt: string; className?: string }> = ({
   }, [src]);
 
   return (
-    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className || "h-64"}`}>
+    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className || "h-48 md:h-64"}`}>
       {status === "loading" && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <Loader2 size={28} className="animate-spin text-gray-400" />
+          <Loader2 size={24} className="animate-spin text-gray-400" />
         </div>
       )}
       {status === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-500 gap-2 p-4">
-          <AlertTriangle size={28} />
-          <span className="text-sm text-center">Rasm yuklanmadi</span>
-          {retryCount < maxRetries && (
-            <button
-              onClick={() => { setRetryCount(prev => prev + 1); setStatus("loading"); }}
-              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium"
-            >
-              Qayta yuklash
-            </button>
-          )}
+          <AlertTriangle size={24} />
+          <span className="text-xs text-center">Rasm yuklanmadi</span>
+          <button
+            onClick={() => { setRetryCount(prev => prev + 1); setStatus("loading"); }}
+            className="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium"
+          >
+            Qayta yuklash
+          </button>
         </div>
       )}
       <img
@@ -1876,14 +1888,12 @@ const ExamImage: React.FC<{ src: string; alt: string; className?: string }> = ({
         alt={alt}
         className={`w-full h-full object-cover transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"}`}
         referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
         onLoad={() => setStatus("loaded")}
         onError={() => {
           if (retryCount < maxRetries) {
-            // Auto-retry after a short delay
             setTimeout(() => {
               setRetryCount(prev => prev + 1);
-            }, 1000 * (retryCount + 1));
+            }, 800 * (retryCount + 1));
           } else {
             setStatus("error");
           }
