@@ -644,11 +644,11 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                   </div>
                 )
               ) : activeTab === "vocab" ? (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div key="vocab" className="flex-1 overflow-y-auto p-4">
                   <VocabularyBuilder />
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div key="progress" className="flex-1 overflow-y-auto p-4">
                   <ProgressDashboard />
                 </div>
               )}
