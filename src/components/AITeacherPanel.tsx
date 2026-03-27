@@ -85,7 +85,13 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [panelWidth, setPanelWidth] = useState(480);
+  const [fontSize, setFontSize] = useState(14);
+  const [quotedText, setQuotedText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isResizingRef = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
 
   // Re-recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -310,7 +316,7 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
         try {
           const progress = JSON.parse(progressMatch[1].trim());
           const id = `progress_${Date.now()}`;
-          await localforage.setItem(id, { ...progress, id, timestamp: Date.now(), vocabularyCount: vocabMatches?.length || 0 });
+          await localforage.setItem(id, { ...progress, id, timestamp: Date.now(), vocabularyCount: vocabBlockMatches?.length || 0 });
         } catch (e) {
           console.error("Error parsing progress:", e);
         }
@@ -335,9 +341,12 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
   const handleSendMessage = async () => {
     if (!input.trim() || isTyping) return;
 
-    const userMessage = input.trim();
+    const userMessage = quotedText
+      ? `> "${quotedText}"\n\n${input.trim()}`
+      : input.trim();
     setMessages(prev => [...prev, { role: "user", text: userMessage }]);
     setInput("");
+    setQuotedText("");
     setSuggestions([]);
     setIsTyping(true);
 
@@ -464,202 +473,237 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  const startResize = useCallback((e: React.MouseEvent) => {
+    isResizingRef.current = true;
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = resizeStartX.current - ev.clientX;
+      setPanelWidth(Math.min(860, Math.max(360, resizeStartWidth.current + delta)));
+    };
+    const onUp = () => {
+      isResizingRef.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
+
+  const handleTextSelect = useCallback(() => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() ?? "";
+    if (text.length > 8) setQuotedText(text);
+  }, []);
+
+  const cleanText = (text: string) =>
+    text
+      .replace(/\[VOCAB_START\][\s\S]*?\[VOCAB_END\]/g, "")
+      .replace(/\[PROGRESS_START\][\s\S]*?\[PROGRESS_END\]/g, "")
+      .replace(/\[SUGGEST_START\][\s\S]*?\[SUGGEST_END\]/g, "")
+      .trim();
+
   return (
     <AnimatePresence>
       {isOpen && (
         <>
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black z-40"
+            className="fixed inset-0 bg-gradient-to-br from-violet-950/60 to-indigo-950/60 backdrop-blur-sm z-40"
           />
+          {/* Panel */}
           <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-full md:w-[480px] bg-white shadow-2xl z-50 flex flex-col"
+            initial={{ x: "100%", opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 220 }}
+            style={{ width: typeof window !== "undefined" && window.innerWidth < 768 ? "100%" : panelWidth }}
+            className="fixed top-0 right-0 h-full bg-white/95 backdrop-blur-2xl shadow-[0_0_60px_rgba(109,40,217,0.2)] z-50 flex flex-col border-l border-violet-100/60"
           >
-            {/* Header */}
-            <div className="p-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="relative bg-white/20 p-1.5 rounded-xl">
-                  <GraduationCap size={22} />
-                  <Sparkles size={9} className="absolute -top-1 -right-1 text-yellow-300" />
+            {/* Resize handle — desktop only */}
+            <div
+              onMouseDown={startResize}
+              className="hidden md:flex absolute left-0 top-0 w-2 h-full cursor-col-resize z-20 items-center justify-center group"
+            >
+              <div className="w-0.5 h-14 rounded-full bg-violet-200 group-hover:bg-violet-400 group-hover:h-20 transition-all duration-200" />
+            </div>
+            {/* Header — glassmorphism gradient */}
+            <div className="relative overflow-hidden shrink-0">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-600" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15)_0%,_transparent_60%)]" />
+              <div className="relative px-4 py-3 flex justify-between items-center gap-2">
+                {/* Logo + title */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative shrink-0 bg-white/20 backdrop-blur-sm p-2 rounded-xl border border-white/25 shadow-lg">
+                    <GraduationCap size={20} className="text-white" />
+                    <Sparkles size={8} className="absolute -top-1 -right-1 text-yellow-300 drop-shadow" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-white text-[15px] leading-tight">AI Examiner</h2>
+                    <p className="text-white/55 text-[9px] tracking-widest uppercase truncate">Professional CEFR Feedback</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-bold text-lg leading-tight">AI Examiner</h2>
-                  <p className="text-[10px] text-white/70">Professional CEFR Feedback</p>
+                {/* Controls */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {/* Font size — desktop only */}
+                  <div className="hidden md:flex items-center gap-0.5 mr-1.5 bg-white/10 rounded-lg p-0.5">
+                    <button onClick={() => setFontSize(s => Math.max(11, s - 1))}
+                      className="w-6 h-6 text-white/80 hover:text-white hover:bg-white/20 rounded-md text-xs font-bold transition-all flex items-center justify-center">A-</button>
+                    <button onClick={() => setFontSize(s => Math.min(20, s + 1))}
+                      className="w-6 h-6 text-white/80 hover:text-white hover:bg-white/20 rounded-md text-sm font-bold transition-all flex items-center justify-center">A+</button>
+                  </div>
+                  {/* Tabs */}
+                  {(["chat", "vocab", "progress"] as const).map((tab) => (
+                    <button key={tab} onClick={() => setActiveTab(tab)}
+                      className={`p-2 rounded-xl transition-all ${activeTab === tab ? "bg-white/25 shadow-inner" : "hover:bg-white/15"}`}>
+                      {tab === "chat" && <MessageSquare size={17} className="text-white" />}
+                      {tab === "vocab" && <BookOpen size={17} className="text-white" />}
+                      {tab === "progress" && <BarChart size={17} className="text-white" />}
+                    </button>
+                  ))}
+                  <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors ml-0.5 border border-white/10">
+                    <X size={17} className="text-white" />
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => setActiveTab("chat")}
-                  className={`p-2 rounded-lg transition-colors ${activeTab === "chat" ? "bg-white/25" : "hover:bg-white/15"}`}
-                  title="Chat"
-                >
-                  <MessageSquare size={18} />
-                </button>
-                <button
-                  onClick={() => setActiveTab("vocab")}
-                  className={`p-2 rounded-lg transition-colors ${activeTab === "vocab" ? "bg-white/25" : "hover:bg-white/15"}`}
-                  title="Lug'at"
-                >
-                  <BookOpen size={18} />
-                </button>
-                <button
-                  onClick={() => setActiveTab("progress")}
-                  className={`p-2 rounded-lg transition-colors ${activeTab === "progress" ? "bg-white/25" : "hover:bg-white/15"}`}
-                  title="Progress"
-                >
-                  <BarChart size={18} />
-                </button>
-                <button onClick={onClose} className="p-2 hover:bg-white/15 rounded-lg transition-colors ml-1">
-                  <X size={18} />
-                </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
+            {/* Content area */}
+            <div className="flex-1 overflow-hidden flex flex-col bg-gradient-to-b from-slate-50 via-white to-indigo-50/30">
               {activeTab === "chat" ? (
                 !selectedAnswer ? (
-                  /* Answer Selection List */
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <h3 className="font-bold text-gray-700 mb-4">Saqlangan javoblaringiz:</h3>
+                  /* ── Answer Selection List ── */
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <p className="text-xs font-semibold text-violet-400 uppercase tracking-widest px-1">Saqlangan javoblar</p>
                     {savedAnswers.length === 0 ? (
-                      <div className="text-center mt-10 px-4">
-                        <GraduationCap size={48} className="mx-auto text-gray-300 mb-4" />
-                        <p className="text-gray-500">Hali hech qanday javob saqlanmagan.</p>
-                        <p className="text-gray-400 text-sm mt-2">Mock yoki Practice rejimida javob berganingizda ular shu yerda paydo bo'ladi.</p>
+                      <div className="text-center mt-16 px-6">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center">
+                          <GraduationCap size={32} className="text-violet-400" />
+                        </div>
+                        <p className="text-gray-600 font-medium">Hali javob saqlanmagan</p>
+                        <p className="text-gray-400 text-sm mt-1">Mock yoki Practice rejimida javob bering</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {savedAnswers.map((answer) => (
-                          <div
-                            key={answer.id}
-                            onClick={() => handleSelectAnswer(answer)}
-                            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
-                                {answer.part}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                {answer.analysis && (
-                                  <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-medium">Tahlil qilingan</span>
-                                )}
-                                <button
-                                  onClick={(e) => handleDeleteAnswer(answer.id, e)}
-                                  className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-800 font-medium line-clamp-2 mb-2">
-                              {answer.questionText}
-                            </p>
-                            <div className="text-xs text-gray-500">
-                              {new Date(answer.timestamp).toLocaleString()}
+                      savedAnswers.map((answer) => (
+                        <motion.div
+                          key={answer.id}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => handleSelectAnswer(answer)}
+                          className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-violet-100/60 cursor-pointer hover:border-violet-300 hover:shadow-[0_4px_20px_rgba(109,40,217,0.1)] transition-all group shadow-sm"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
+                              {answer.part}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {answer.analysis && (
+                                <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium border border-emerald-100">✓ Tahlil</span>
+                              )}
+                              <button onClick={(e) => handleDeleteAnswer(answer.id, e)}
+                                className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-lg hover:bg-red-50">
+                                <Trash2 size={14} />
+                              </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <p className="text-sm text-gray-800 font-medium line-clamp-2 mb-2 leading-relaxed">{answer.questionText}</p>
+                          <p className="text-[10px] text-gray-400">{new Date(answer.timestamp).toLocaleString()}</p>
+                        </motion.div>
+                      ))
                     )}
                   </div>
                 ) : (
-                  /* Chat + Analysis View */
-                  <div className="flex-1 flex flex-col h-full">
+                  /* ── Chat + Analysis View ── */
+                  <div className="flex-1 flex flex-col h-full" style={{ fontSize }}>
                     {/* Selected answer header */}
-                    <div className="bg-white p-3 border-b shadow-sm">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                    <div className="bg-white/70 backdrop-blur-sm px-4 py-3 border-b border-violet-100/50 shrink-0">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
                           {selectedAnswer.part}
                         </span>
                         <button
-                          onClick={() => {
-                            setSelectedAnswer(null);
-                            setMessages([]);
-                            setReRecordedAudioUrl(null);
-                            setReRecordedBlob(null);
-                            stopRecording();
-                          }}
-                          className="text-xs text-gray-500 hover:text-indigo-600 underline"
+                          onClick={() => { setSelectedAnswer(null); setMessages([]); setReRecordedAudioUrl(null); setReRecordedBlob(null); stopRecording(); setQuotedText(""); }}
+                          className="text-[11px] text-violet-500 hover:text-violet-700 font-medium transition-colors"
                         >
-                          Boshqasini tanlash
+                          ← Boshqasini tanlash
                         </button>
                       </div>
-                      <p className="text-sm text-gray-800 font-medium">{selectedAnswer.questionText}</p>
+                      <p className="text-sm text-gray-800 font-medium leading-snug">{selectedAnswer.questionText}</p>
                       {selectedAnswer.audioUrl && (
-                        <audio controls src={selectedAnswer.audioUrl} className="w-full h-8 mt-2" />
+                        <audio controls src={selectedAnswer.audioUrl} className="w-full h-8 mt-2 rounded-xl" />
                       )}
                     </div>
 
-                    {/* Messages area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3" onMouseUp={handleTextSelect}>
                       {messages.map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[90%] rounded-2xl p-3 ${
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div className={`max-w-[92%] rounded-2xl px-3.5 py-3 ${
                             msg.role === "user"
-                              ? "bg-indigo-600 text-white rounded-tr-sm"
-                              : "bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm"
+                              ? "bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(109,40,217,0.3)]"
+                              : "bg-white/80 backdrop-blur-sm border border-violet-100/60 text-gray-800 rounded-tl-sm shadow-[0_2px_12px_rgba(99,102,241,0.07)]"
                           }`}>
-                            <div className="flex items-center gap-2 mb-1 opacity-70">
+                            {/* Message role label */}
+                            <div className={`flex items-center gap-1.5 mb-1.5 ${msg.role === "user" ? "opacity-70" : "opacity-60"}`}>
                               {msg.role === "user" ? (
-                                <User size={12} />
+                                <User size={11} />
                               ) : isStreaming && idx === messages.length - 1 ? (
-                                <motion.div
-                                  animate={{ scale: [1, 1.35, 1] }}
-                                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                                  style={{ display: "flex" }}
-                                >
-                                  <GraduationCap size={12} />
+                                <motion.div animate={{ scale: [1, 1.35, 1] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }} style={{ display: "flex" }}>
+                                  <GraduationCap size={11} />
                                 </motion.div>
                               ) : (
-                                <GraduationCap size={12} />
+                                <GraduationCap size={11} />
                               )}
-                              <span className="text-[10px] font-bold uppercase">
+                              <span className="text-[9px] font-bold uppercase tracking-wider">
                                 {msg.role === "user" ? "Siz" : "AI Examiner"}
                               </span>
                               {msg.role === "model" && isStreaming && idx === messages.length - 1 && (
-                                <span className="text-[9px] text-indigo-400 font-medium animate-pulse ml-1">yozmoqda...</span>
+                                <span className="text-[9px] text-violet-400 font-medium animate-pulse">· yozmoqda</span>
                               )}
                             </div>
-                            <div className="text-sm prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-gray-100 prose-pre:text-gray-800 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:text-xs [&_th]:bg-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-gray-100 [&_tr:nth-child(even)_td]:bg-gray-50 [&_tr:hover_td]:bg-indigo-50 [&_table]:shadow-sm">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {msg.text
-                                  .replace(/\[VOCAB_START\][\s\S]*?\[VOCAB_END\]/g, "")
-                                  .replace(/\[PROGRESS_START\][\s\S]*?\[PROGRESS_END\]/g, "")
-                                  .replace(/\[SUGGEST_START\][\s\S]*?\[SUGGEST_END\]/g, "")
-                                  .trim()}
-                              </ReactMarkdown>
+                            {/* Content */}
+                            <div className={`prose prose-sm max-w-none leading-relaxed
+                              prose-p:my-1 prose-p:leading-relaxed
+                              prose-pre:bg-slate-100 prose-pre:text-slate-800 prose-pre:rounded-xl prose-pre:text-xs
+                              prose-code:text-violet-600 prose-code:bg-violet-50 prose-code:px-1 prose-code:rounded
+                              [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:text-xs
+                              [&_th]:bg-gradient-to-r [&_th]:from-violet-600 [&_th]:to-indigo-600 [&_th]:text-white [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold
+                              [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-violet-50
+                              [&_tr:nth-child(even)_td]:bg-violet-50/40 [&_tr:hover_td]:bg-indigo-50/60
+                              [&_table]:shadow-sm [&_blockquote]:border-l-4 [&_blockquote]:border-violet-300 [&_blockquote]:pl-3 [&_blockquote]:text-gray-600 [&_blockquote]:italic
+                              ${msg.role === "user" ? "prose-invert [&_*]:text-white/90" : ""}`}>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanText(msg.text)}</ReactMarkdown>
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       ))}
+
+                      {/* Typing indicator */}
                       {isTyping && (
                         <div className="flex justify-start">
-                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
-                            <div className="flex items-center gap-2 mb-2 opacity-60">
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                                style={{ display: "flex" }}
-                              >
-                                <GraduationCap size={12} />
+                          <div className="bg-white/80 backdrop-blur-sm border border-violet-100/60 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-2 opacity-50">
+                              <motion.div animate={{ scale: [1, 1.35, 1] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }} style={{ display: "flex" }}>
+                                <GraduationCap size={11} />
                               </motion.div>
-                              <span className="text-[10px] font-bold uppercase">AI Examiner</span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider">AI Examiner</span>
                             </div>
-                            <div className="flex items-center gap-1.5 px-1">
+                            <div className="flex items-center gap-1.5">
                               {[0, 1, 2].map(i => (
-                                <motion.div
-                                  key={i}
-                                  className="w-2.5 h-2.5 bg-indigo-400 rounded-full"
-                                  animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
-                                  transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
-                                />
+                                <motion.div key={i} className="w-2 h-2 bg-violet-400 rounded-full"
+                                  animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
+                                  transition={{ duration: 0.65, repeat: Infinity, delay: i * 0.16, ease: "easeInOut" }} />
                               ))}
                             </div>
                           </div>
@@ -668,79 +712,68 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Quick reply suggestion chips */}
+                    {/* Quote selected text banner */}
+                    <AnimatePresence>
+                      {quotedText && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                          className="mx-3 mb-1 flex items-start gap-2 bg-violet-50/90 backdrop-blur-sm border-l-4 border-violet-400 rounded-r-xl px-3 py-2">
+                          <span className="text-[11px] text-violet-700 flex-1 line-clamp-2 italic">"{quotedText}"</span>
+                          <button onClick={() => setQuotedText("")} className="text-gray-400 hover:text-red-400 shrink-0 mt-0.5 transition-colors">
+                            <X size={13} />
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Suggestion chips */}
                     <AnimatePresence>
                       {suggestions.length > 0 && !isStreaming && !isTyping && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 8 }}
-                          transition={{ duration: 0.25 }}
-                          className="px-4 pt-2 pb-1 flex flex-col gap-1.5"
-                        >
-                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">💬 Savol bering:</p>
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
+                          transition={{ duration: 0.2 }} className="px-3 pt-1.5 pb-1 flex flex-col gap-1.5">
+                          <p className="text-[9px] text-violet-400 font-semibold uppercase tracking-widest px-1">💬 Savol bering:</p>
                           {suggestions.map((s, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setInput(s)}
-                              className="text-left text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 hover:bg-indigo-100 active:scale-95 transition-all"
-                            >
+                            <motion.button key={i} whileTap={{ scale: 0.97 }} onClick={() => setInput(s)}
+                              className="text-left text-xs text-violet-700 bg-violet-50/80 backdrop-blur-sm border border-violet-100/80 rounded-xl px-3 py-2 hover:bg-violet-100/80 hover:border-violet-200 transition-all shadow-sm">
                               {s}
-                            </button>
+                            </motion.button>
                           ))}
                         </motion.div>
                       )}
                     </AnimatePresence>
 
                     {/* Re-record section */}
-                    <div className="bg-gradient-to-t from-gray-100 to-transparent px-4 pt-2 pb-0">
+                    <div className="px-3 pt-2 pb-1 shrink-0">
                       {!isRecording && !reRecordedAudioUrl && (
-                        <button
-                          onClick={startRecording}
-                          disabled={isTyping || isAnalyzingReRecord}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Mic size={16} />
+                        <button onClick={startRecording} disabled={isTyping || isAnalyzingReRecord}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50/80 backdrop-blur-sm text-rose-500 border border-rose-200/60 rounded-2xl hover:bg-rose-100/80 transition-all text-sm font-medium disabled:opacity-50 shadow-sm">
+                          <Mic size={15} />
                           Qayta yozdirish (Re-record)
                         </button>
                       )}
                       {isRecording && (
-                        <div className="flex items-center gap-3 py-2">
-                          <div className="flex-1 flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
-                            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                            <span className="text-red-700 font-mono text-sm font-bold">{formatTime(recordingTime)}</span>
-                            <span className="text-red-500 text-xs">Yozilmoqda...</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center gap-2.5 bg-rose-50/80 border border-rose-200/60 rounded-2xl px-4 py-2.5">
+                            <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.6)]" />
+                            <span className="text-rose-700 font-mono text-sm font-bold">{formatTime(recordingTime)}</span>
+                            <span className="text-rose-400 text-xs">yozilmoqda...</span>
                           </div>
-                          <button
-                            onClick={stopRecording}
-                            className="bg-red-600 text-white p-3 rounded-xl hover:bg-red-700 transition-colors"
-                          >
-                            <Square size={16} fill="white" />
+                          <button onClick={stopRecording} className="bg-gradient-to-br from-rose-500 to-red-600 text-white p-3 rounded-2xl shadow-md hover:shadow-lg transition-all">
+                            <Square size={15} fill="white" />
                           </button>
                         </div>
                       )}
                       {reRecordedAudioUrl && !isRecording && (
-                        <div className="flex flex-col gap-2 py-2">
-                          <audio controls src={reRecordedAudioUrl} className="w-full h-8" />
+                        <div className="flex flex-col gap-2">
+                          <audio controls src={reRecordedAudioUrl} className="w-full h-8 rounded-xl" />
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                if (reRecordedAudioUrl) URL.revokeObjectURL(reRecordedAudioUrl);
-                                setReRecordedAudioUrl(null);
-                                setReRecordedBlob(null);
-                              }}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors text-sm"
-                            >
-                              <RotateCcw size={14} />
-                              Qayta yozdirish
+                            <button onClick={() => { if (reRecordedAudioUrl) URL.revokeObjectURL(reRecordedAudioUrl); setReRecordedAudioUrl(null); setReRecordedBlob(null); }}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100/80 text-gray-600 rounded-2xl hover:bg-gray-200/80 transition-colors text-sm font-medium">
+                              <RotateCcw size={13} /> Qayta
                             </button>
-                            <button
-                              onClick={handleReRecordAnalysis}
-                              disabled={isAnalyzingReRecord || isTyping}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-medium disabled:opacity-50"
-                            >
-                              {isAnalyzingReRecord ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                              Tahlil qilish
+                            <button onClick={handleReRecordAnalysis} disabled={isAnalyzingReRecord || isTyping}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-2xl hover:shadow-lg transition-all text-sm font-medium disabled:opacity-50 shadow-md">
+                              {isAnalyzingReRecord ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                              Tahlil
                             </button>
                           </div>
                         </div>
@@ -748,24 +781,25 @@ export const AITeacherPanel: React.FC<AITeacherPanelProps> = ({ isOpen, onClose,
                     </div>
 
                     {/* Text input */}
-                    <div className="p-3 bg-white border-t">
-                      <div className="flex gap-2">
+                    <div className="px-3 pb-3 pt-1.5 bg-white/60 backdrop-blur-sm border-t border-violet-100/40 shrink-0">
+                      <div className="flex gap-2 items-center">
                         <input
                           type="text"
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                          placeholder="Savol yoki fikringizni yozing..."
-                          className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                          placeholder={quotedText ? "Iqtibosga javob yozing..." : "Savol yoki fikringizni yozing..."}
+                          className="flex-1 bg-white/70 backdrop-blur-sm border border-violet-200/60 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200/50 placeholder-gray-400 transition-all"
                           disabled={isTyping}
                         />
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.92 }}
                           onClick={handleSendMessage}
                           disabled={isTyping || !input.trim()}
-                          className="bg-indigo-600 text-white p-2.5 rounded-full hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white p-2.5 rounded-2xl hover:shadow-lg transition-all disabled:opacity-50 shadow-md shrink-0"
                         >
-                          <Send size={18} />
-                        </button>
+                          <Send size={17} />
+                        </motion.button>
                       </div>
                     </div>
                   </div>
